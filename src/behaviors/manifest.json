@@ -1,0 +1,35 @@
+{
+  "format_version": 1,
+  "header": {
+    "name": "chess",
+    "description": "Chess for Minecraft",
+    "uuid": "11a8617e-a9b5-4b9d-a2b7-e7859dea1ace",
+    "version": [
+      1,
+      0,
+      0
+    ]
+  },
+  "modules": [
+    {
+      "description": "behaviours for chess",
+      "type": "client_data",
+      "uuid": "4d5f1e8f-cc6c-487c-9abe-832251872ee7",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "7bfb610f-cb55-4b71-96aa-57265de8db5a",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ]
+}
