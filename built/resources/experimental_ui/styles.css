@@ -1,0 +1,155 @@
+@font-face {
+    font-family: 'MinecraftTen';
+    src: url(fonts/MinecraftTen.otf);
+}
+
+body {
+    font-family: "MinecraftTen";
+}
+
+p {
+	margin: 0;
+	padding: 0;
+}
+
+
+button {
+	color: #4C4C4C;
+	background-color: #d4d4d4;
+	padding-left: 10px;
+	padding-right: 10px;
+	padding-top: 10px;
+	padding-bottom: 10px;
+	margin-top: 0;
+	margin-bottom: 0;
+	margin-left: 0;
+	margin-right: 4px;
+	display: flex;
+	border: 3px solid #8b8b8b;
+	font-family: 'MinecraftTen';
+	font-size: 20px;
+}
+
+button:hover {
+	border: 3px solid #FFFFFF;
+	background-color: #007305;
+	color: #FFFFFF
+}
+
+.EmergencyExit {
+	display: flex;
+	justify-content: end;
+	align-items: flex-end;
+	flex-direction: column;
+	position: relative;
+}
+
+.GameMessage {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex-direction: column;
+	position: relative;
+	top: -5vh;
+}
+
+.GameMessage p {
+	font-family: 'MinecraftTen';
+	font-size: 60px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex-direction: column;
+}
+
+.redTint {
+	background-color: rgba(200, 25, 25, 190);
+}
+
+.greenTint {
+	background-color: rgba(25, 200, 25, 190);
+}
+
+.screenBox {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100vh;
+	width: 100vw;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+/*
+.turn_order_group {
+	font-family: 'MinecraftTen';
+	font-size: 30px;
+
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: flex-start;
+	
+	position: absolute;
+	top: 100px;
+	left: 0;
+}
+
+
+.ability_panel {
+	font-family: 'MinecraftTen';
+	font-size: 30px;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	position: absolute;
+	bottom: 36px;
+	height: 36px;
+}
+
+.ability_panel p {
+	font-family: 'MinecraftTen';
+	font-size: 30px;
+	padding-top: 15px;
+}
+
+.ability_button_group {
+	padding: 0;
+	margin: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: absolute;
+	bottom: 36px;
+	height: 36px;
+}
+
+.ability_button {
+	height: 46px;
+	width: 46px;
+	background-repeat: no-repeat;
+	background-position: center;
+}
+
+.turn_order_frame {
+	height: 66px;
+	width: 66px;
+	background-repeat: no-repeat;
+	background-position: center;
+	border: 3px solid transparent;
+}
+
+
+.active {
+	border: 3px solid #66FF66;
+}
+
+.dead {
+	border: 3px solid transparent;
+	opacity: 0.5;
+}
+*/

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <script src="UIEngine.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+	<div id="_body_" class="screenBox">
+		<div class="GameMessage">
+			<button id="_join_">Join</button>
+		</div>
+    </div>
+    <div class="EmergencyExit">
+        <button id="_exit_">X</button>
+    </div>
+</body>
+
+<script type="text/javascript">
+
+    // Get a handle to the scripting interface on creation.
+    // The script interface can trigger events to the client script
+    var scriptEngineHandle = undefined;
+    engine.on("scriptEngine:created", function (scriptEngine) {
+        scriptEngineHandle = scriptEngine;
+    });
+
+    //Route start and exit buttons to events in the scripting engine
+    document.getElementById("_join_").addEventListener("click", ()  => scriptEngineHandle.triggerEvent("chess:join_game"));
+    document.getElementById("_exit_").addEventListener("click", () => scriptEngineHandle.triggerEvent("chess:close_ui"));
+
+</script>
+</html>
