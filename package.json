@@ -8,9 +8,11 @@
     "uninstallmod": "gulp uninstall"
   },
   "devDependencies": {
-    "gulp-typescript": "^5.0.0-alpha.3",
+    "gulp-typescript": "^5.0.0",
     "minecraft-scripting-toolchain": "github:minecraft-addon-tools/minecraft-scripting-toolchain",
-    "minecraft-scripting-types": "github:minecraft-addon-tools/minecraft-scripting-types",
-    "typescript": "^3.1.6"
-  }
+    "minecraft-scripting-types-client": "^0.1.3",
+    "minecraft-scripting-types-server": "^0.1.3",
+    "typescript": "^3.2.1"
+  },
+  "dependencies": {}
 }

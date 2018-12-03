@@ -1,24 +1,5 @@
-export const enum ChessEvents {
-    JoinNewGame = 'chess:join_new_game',
-    GameStarting = 'chess:notify_game_starting'
-}
-
-export interface GameBoard {
-    location: Location2;
-    hasStarted: boolean;
-    players: IEntityObject[];
-}
-
-export interface Location2 {
-    x: number;
-    z: number;
-}
-
-export interface PlayerLocation {
-    x: number;
-    y: number;
-    z: number;
-}
+///<reference types="minecraft-scripting-types-shared" />
+import { Location2 } from "./maths";
 
 export interface PieceSet {
     name: PieceSetName,
@@ -49,4 +30,11 @@ export const enum Piece {
     Bishop = "bishop",
     Knight = "knight",
     Pawn = "pawn"
+}
+
+export interface GameBoard {
+    location: Location2;
+    hasStarted: boolean;
+    players: IEntityObject[];
+    highlightedBlock: Vector;
 }

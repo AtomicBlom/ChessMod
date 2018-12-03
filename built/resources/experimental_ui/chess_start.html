@@ -26,9 +26,15 @@
         scriptEngineHandle = scriptEngine;
     });
 
-    //Route start and exit buttons to events in the scripting engine
-    document.getElementById("_join_").addEventListener("click", ()  => scriptEngineHandle.triggerEvent("chess:join_game"));
-    document.getElementById("_exit_").addEventListener("click", () => scriptEngineHandle.triggerEvent("chess:close_ui"));
+    function sendEvent(eventName, eventData) {
+        scriptEngineHandle.triggerEvent(JSON.stringify({
+            name: eventName,
+            data: eventData
+        }))
+    }
 
+    //Route start and exit buttons to events in the scripting engine
+    document.getElementById("_join_").addEventListener("click", () => sendEvent("chess:join_game"));
+    document.getElementById("_exit_").addEventListener("click", () => sendEvent("chess:close_ui"));
 </script>
 </html>

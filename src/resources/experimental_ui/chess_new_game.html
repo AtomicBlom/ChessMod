@@ -7,3 +7,46 @@
     <link rel="stylesheet" href="styles.css" />
 </head>
 
+<body>
+	<div id="_body_" class="screenBox">
+		<div id="_message_" class="GameMessage">
+			TODO: Stuffz
+		</div>
+    </div>
+    <div class="EmergencyExit">
+        <button id="_exit_">X</button>
+    </div>
+</body>
+
+<script type="text/javascript">
+
+    // Get a handle to the scripting interface on creation.
+    // The script interface can trigger events to the client script
+    var scriptEngineHandle = undefined;
+    engine.on("scriptEngine:created", function (scriptEngine) {
+        scriptEngineHandle = scriptEngine;
+    });
+
+    function sendEvent(eventName, eventData) {
+        scriptEngineHandle.triggerEvent(JSON.stringify({
+            name: eventName,
+            data: eventData
+        }))
+    }
+
+    //Route start and exit buttons to events in the scripting engine
+    document.getElementById("_exit_").addEventListener("click", () => sendEvent("chess:close_ui"));
+    const body = document.getElementById("_body_");
+    /*body.addEventListener("mousemove", (e) => sendEvent("chess:on_mouse_move", {
+        x: e.clientX, 
+        y: e.clientY, 
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight
+    }));*/
+
+    engine.on("chess:raytrace", rawData => {
+        document.getElementById("_message_").innerText = rawData;
+        var rayTraceData = JSON.parse(rawData);
+    })
+</script>
+</html>

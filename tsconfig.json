@@ -3,10 +3,8 @@
     "compilerOptions": {
         "module": "ES6",
         "noImplicitAny": true,
-        "types": [
-            "minecraft-scripting-types"
-        ],
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "target": "es5"
     },
     "include": [
         "src/scripts/*/*",
