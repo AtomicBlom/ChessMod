@@ -1,5 +1,5 @@
 ///<reference types="minecraft-scripting-types-shared" />
-import { Location2 } from "./maths";
+import { VectorXZ } from "./maths";
 
 export interface PieceSet {
     name: PieceSetName,
@@ -32,9 +32,15 @@ export const enum Piece {
     Pawn = "pawn"
 }
 
+export const enum PieceColour {
+    Black = "black",
+    White = "white"
+}
+
 export interface GameBoard {
-    location: Location2;
+    selectedPiece: IEntityObject;
+    location: VectorXZ;
     hasStarted: boolean;
     players: IEntityObject[];
-    highlightedBlock: Vector;
+    highlightedBlock: VectorXZ;
 }

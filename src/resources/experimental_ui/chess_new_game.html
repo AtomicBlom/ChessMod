@@ -36,17 +36,5 @@
 
     //Route start and exit buttons to events in the scripting engine
     document.getElementById("_exit_").addEventListener("click", () => sendEvent("chess:close_ui"));
-    const body = document.getElementById("_body_");
-    /*body.addEventListener("mousemove", (e) => sendEvent("chess:on_mouse_move", {
-        x: e.clientX, 
-        y: e.clientY, 
-        screenWidth: window.innerWidth,
-        screenHeight: window.innerHeight
-    }));*/
-
-    engine.on("chess:raytrace", rawData => {
-        document.getElementById("_message_").innerText = rawData;
-        var rayTraceData = JSON.parse(rawData);
-    })
 </script>
 </html>

@@ -1,7 +1,13 @@
 ///<reference types="minecraft-scripting-types-shared" />
 
-export interface Location2 {
+export interface VectorXZ {
     x: number;
+    z: number;
+}
+
+export interface VectorXYZ {
+    x: number;
+    y: number;
     z: number;
 }
 

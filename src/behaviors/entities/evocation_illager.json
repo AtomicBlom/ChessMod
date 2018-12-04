@@ -1,0 +1,36 @@
+{
+    "format_version": "1.8.0-beta.1",
+    "minecraft:entity": {
+        "components": {
+            "minecraft:identifier": {
+                "id": "minecraft:evocation_illager"
+            },
+            "minecraft:type_family": {
+                "family": [ "bishop", "monster" ]
+            },
+            "minecraft:collision_box": {
+                "width": 0.6,
+                "height": 1.95
+            },
+            "minecraft:health": {
+                "value": 24,
+                "max": 24
+            },
+            "minecraft:physics": {},
+            "minecraft:nameable": {},
+            "minecraft:push_through": {
+                "value": 1.0
+            },
+			"minecraft:damage_sensor": [{
+				"on_damage": {
+					"filters": {
+						"test": "is_family",
+						"subject": "other",
+						"value": "player"
+					}
+				},
+				"deals_damage": false
+			}]
+        }
+    }
+}
