@@ -20,7 +20,6 @@ namespace Client {
         system.listenForEvent(ReceiveFromMinecraftClient.ClientEnteredWorld, onClientEnteredWorld);
         system.listenForEvent(ChessEvents.SetPlayerNumber, onSetPlayerNumber);
         system.listenForEvent(ReceiveFromMinecraftClient.HitResultContinuous, onPickHitResultChanged);
-
         system.listenForEvent(ChessEvents.GameStarting, onGameStarting);
     }
 
@@ -60,7 +59,8 @@ namespace Client {
     function onGameStarting(game: GameBoard) {
         if (!game.players.some(p => p.id === thisClient.id)) return;
         gameBoard = game;
-        loadUI(UI.NewGame);
+        unloadUI(UI.Lobby);
+        //loadUI(UI.NewGame);
     }
 
     function onUIMessage(event: string) {

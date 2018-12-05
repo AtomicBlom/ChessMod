@@ -42,5 +42,7 @@ export interface GameBoard {
     location: VectorXZ;
     hasStarted: boolean;
     players: IEntityObject[];
+    currentPlayerColour: PieceColour;
     highlightedBlock: VectorXZ;
+    isComplete: boolean;
 }

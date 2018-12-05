@@ -19,7 +19,7 @@ namespace Server {
                 king: "minecraft:vindicator",
                 queen: "minecraft:witch",
                 bishop: "minecraft:evocation_illager",
-                knight: "minecraft:creeper", //TODO: Change to illager beast
+                knight: "minecraft:creeper", //FIXME: Change to illager beast
                 rook: "minecraft:slime",
                 pawn: "minecraft:zombie"
             }
@@ -51,11 +51,22 @@ namespace Server {
 
     function onPlayerAttack(eventData: IPlayerAttackedActorEventData) {
         const playerGames = gameBoards.filter(gb => gb.players.some(p => p.id === eventData.player.id));
-        if (playerGames.length === 0) return;
+        if (playerGames.length === 0) {
+            system.broadcastEvent(SendToMinecraftServer.DisplayChat, `You are not in a game`);
+            return;
+        };
 
         const game = playerGames[0];
+        if (game.isComplete) {
+            return;
+        }
 
-        //FIXME: verify player is the current player.
+        const expectedPlayer = game.players[game.currentPlayerColour === PieceColour.White ? 0 : 1];
+        if (expectedPlayer.id !== eventData.player.id) {
+            system.broadcastEvent(SendToMinecraftServer.DisplayChat, `It is not your turn`);
+            return;
+        }
+
         const health = system.getComponent(eventData.attacked_entity, MinecraftComponent.Health);
         health.health = health.maxHealth;
         system.applyComponentChanges(health);
@@ -64,30 +75,125 @@ namespace Server {
         if (!!chessPiece) {
             const position = system.getComponent(eventData.attacked_entity, MinecraftComponent.Position);
             const boardPosition = getBoardPosition(game, position.x, position.z);
-            if (!!boardPosition) {
+            if (!boardPosition) return;
+
+            if (!game.selectedPiece) {
+                //FIXME: Ensure that if king is in check that the piece has a move that would fix the check state.
+                //Selecting a game piece.
+                if (chessPiece.colour !== game.currentPlayerColour) {
+                    system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cannot select ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} belongs to ${chessPiece.colour}`);
+                    return;
+                };
+                if (getPieceMoves(game, chessPiece, boardPosition).length === 0) {
+                    system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cannot select ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} there are no moves available`);
+                    return;
+                };
                 system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Selected ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
                 game.selectedPiece = eventData.attacked_entity;
                 createMarkers(game, chessPiece, boardPosition);
+            } else {
+                //FIXME: allow castling
+                if (game.selectedPiece.id === eventData.attacked_entity.id) {
+                    game.selectedPiece = null;
+                    removeMarkers(game);
+                    system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cancelled move for ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
+                    return;
+                }
+                //Attacking a piece
+                if (chessPiece.colour === game.currentPlayerColour) {
+                    system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cannot attack ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} belongs to you`);
+                    return;
+                } else {
+                    system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Attacking ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
+                    if (attackPiece(game, eventData.attacked_entity)) {
+                        updateTurn(game);
+                    }
+                }
             }
-        } else if (!!system.getComponent(eventData.attacked_entity, ChessComponents.Marker)) {
+        } else if (!!game.selectedPiece && !!system.getComponent(eventData.attacked_entity, ChessComponents.Marker)) {
             const position = system.getComponent(eventData.attacked_entity, MinecraftComponent.Position);
             const boardPosition = getBoardPosition(game, position.x, position.z);
             if (!!boardPosition) {
                 system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Moving piece to ${boardPosition.x},${boardPosition.z}`);
 
-                movePiece(game, game.selectedPiece, boardPosition);
-                removeMarkers(game);
+                if (movePiece(game, game.selectedPiece, boardPosition)) {
+                    updateTurn(game);
+                };
             }
         }
+    }
+
+    function updateTurn(game: GameBoard) {
+        removeMarkers(game);
+        game.selectedPiece = null;
+        const previousPlayerColour = game.currentPlayerColour;
+        game.currentPlayerColour = game.currentPlayerColour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
+
+        const pieces = findPieces(game, game.currentPlayerColour, Piece.King);
+        if (pieces.length !== 0) {
+            //Should always be the case. don't allow players to actually kill the king.
+            const king = pieces[0];
+            const kingPieceComponent = system.getComponent<ChessPieceComponent>(king, ChessComponents.ChessPiece);
+            const kingPiecePosition = system.getComponent(king, MinecraftComponent.Position);
+            const kingBoardPosition = getBoardPosition(game, kingPiecePosition.x, kingPiecePosition.z);
+
+            const kingState = isKingInCheck(game, kingPieceComponent, kingBoardPosition);
+            if (kingState === KingState.CheckMate) {
+                game.isComplete = true;
+                system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${previousPlayerColour} has won the game`);
+                return;
+            }
+        }
+        
+        system.broadcastEvent(SendToMinecraftServer.DisplayChat, `It is now ${game.currentPlayerColour}'s turn`);
     }
 
     function movePiece(game: GameBoard, entity: IEntityObject, boardPosition: VectorXZ) {
         const worldPosition = getEntityWorldPosition(game, boardPosition.x, boardPosition.z);
 
-        const position = system.getComponent(entity, MinecraftComponent.Position);        
-        position.x = worldPosition.x;
-        position.z = worldPosition.z;
-        system.applyComponentChanges(position);
+        const selectedPiece = system.getComponent<ChessPieceComponent>(game.selectedPiece, ChessComponents.ChessPiece);
+        const selectedPiecePositionComponent = system.getComponent(game.selectedPiece, MinecraftComponent.Position);
+        const selectedPieceBoardPosition = getBoardPosition(game, selectedPiecePositionComponent.x, selectedPiecePositionComponent.z);
+        const move = getPieceMoves(game, selectedPiece, selectedPieceBoardPosition)
+                        .filter(move => move.x === boardPosition.x && move.z === boardPosition.z);
+
+        //FIXME: Manage if user clicked on a marker that was actually an attack.
+        if (move.length > 0 && move[0].type === MoveType.Empty) {
+            const position = system.getComponent(entity, MinecraftComponent.Position);
+            position.x = worldPosition.x;
+            position.z = worldPosition.z;
+            system.applyComponentChanges(position);
+
+            //FIXME: if piece was a pawn, allow them to select a piece.
+            return true;
+        }
+        return false;
+    }
+
+    function attackPiece(game: GameBoard, attackedEntity: IEntityObject) {
+        const attackedPiecePosition = system.getComponent(attackedEntity, MinecraftComponent.Position);
+        const attackBoardPosition = getBoardPosition(game, attackedPiecePosition.x, attackedPiecePosition.z);
+
+        const selectedPiece = system.getComponent<ChessPieceComponent>(game.selectedPiece, ChessComponents.ChessPiece);
+        const selectedPiecePositionComponent = system.getComponent(game.selectedPiece, MinecraftComponent.Position);
+        const selectedPieceBoardPosition = getBoardPosition(game, selectedPiecePositionComponent.x, selectedPiecePositionComponent.z);
+        const move = getPieceMoves(game, selectedPiece, selectedPieceBoardPosition)
+                        .filter(move => move.x === attackBoardPosition.x && move.z === attackBoardPosition.z);
+
+        if (move.length > 0 && move[0].type === MoveType.Attack) {
+            //FIXME: Rather than remove, move the piece off to the side.
+            system.destroyEntity(attackedEntity);
+
+            //Move the attacking piece
+            const worldPosition = getEntityWorldPosition(game, attackBoardPosition.x, attackBoardPosition.z);
+            const position = system.getComponent(game.selectedPiece, MinecraftComponent.Position);
+            position.x = worldPosition.x;
+            position.z = worldPosition.z;
+            system.applyComponentChanges(position);
+            return true;
+        }
+        return false;
+
     }
 
     function getBoardPosition(game: GameBoard, worldX: number, worldZ: number) {
@@ -130,6 +236,12 @@ namespace Server {
     }
 
     function createMarkers(game: GameBoard, piece: ChessPieceComponent, boardPosition: VectorXZ) {
+        for (const move of getPieceMoves(game, piece, boardPosition)) {
+            createMarker(game, move);
+        }
+    }
+
+    function getPieceMoves(game: GameBoard, piece: ChessPieceComponent, boardPosition: VectorXZ): PossiblePieceMove[] {
         switch(piece.type) {
             case Piece.Pawn:
                 return createPawnMarkers(game, boardPosition, piece.forwardVectorZ);
@@ -144,15 +256,58 @@ namespace Server {
             case Piece.Knight:
                 return createKnightMarkers(game, boardPosition);
         }
+        return [];
     }
 
-    function createPawnMarkers(game: GameBoard, boardPosition: VectorXZ, forwardVectorZ: number) {
+    interface PossiblePieceMove {
+        x: number,
+        z: number,
+        type: MoveType,
+    }
+
+    const enum MoveType {
+        Blocked = 'blocked',
+        Attack = 'attack',
+        Empty = 'empty'
+    }
+
+    function checkCanMove(game: GameBoard, x: number, z: number, canAttack: boolean, addItem: (possiblePieceMove: PossiblePieceMove) => void): boolean {
+        if (x < 0 || x >= 8) return false;
+        if (z < 0 || z >= 8) return false;
+
+        const piece = getPieceAtBoardLocation(game, x, z);
+        let result = MoveType.Empty;
+        if (!!piece) {
+            if (canAttack && piece.colour !== game.currentPlayerColour) {
+                result = MoveType.Attack;
+            } else {
+                return false;
+            }
+        }
+
+        addItem(<PossiblePieceMove>{
+            x: x,
+            z: z,
+            type: result
+        })
+        return true;
+    }
+
+    function createPawnMarkers(game: GameBoard, boardPosition: VectorXZ, forwardVectorZ: number): PossiblePieceMove[] {
+        const moves: PossiblePieceMove[] = [];
         let canPlace = true;
-        canPlace = canPlace && createMarker(game, boardPosition.x, boardPosition.z + 1 * forwardVectorZ, false);
-        canPlace = canPlace && createMarker(game, boardPosition.x, boardPosition.z + 2 * forwardVectorZ, false);
+
+        canPlace = canPlace && checkCanMove(game, boardPosition.x, boardPosition.z + 1 * forwardVectorZ, false, move => moves.push(move));
+        canPlace = canPlace && checkCanMove(game, boardPosition.x, boardPosition.z + 2 * forwardVectorZ, false, move => moves.push(move));
+
+        //Only add these moves if it is a valid attack target.
+        checkCanMove(game, boardPosition.x + 1, boardPosition.z + 1 * forwardVectorZ, true, move => move.type === MoveType.Attack && moves.push(move))
+        checkCanMove(game, boardPosition.x - 1, boardPosition.z + 1 * forwardVectorZ, true, move => move.type === MoveType.Attack && moves.push(move))
+        return moves;
     }
 
-    function createBishopMarkers(game: GameBoard, boardPosition: VectorXZ) {
+    function createBishopMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+        const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [{x: 1, z: 1}, {x: -1, z: 1}, {x: 1, z: -1}, {x: -1, z: -1}];
 
         for (const direction of directions) {
@@ -161,68 +316,116 @@ namespace Server {
             while (canPlace) {
                 position.x += direction.x;
                 position.z += direction.z;
-                canPlace = createMarker(game, position.x, position.z, true);
+                canPlace = checkCanMove(game, position.x, position.z, true, move => moves.push(move));
             }
         }
+        return moves;
     }
 
-    function createRookMarkers(game: GameBoard, boardPosition: VectorXZ) {
+    function createRookMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+        const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [{x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1}];
         
         for (const direction of directions) {
-            let position: VectorXZ = {x: boardPosition.x, z: boardPosition.z};
+            let x = boardPosition.x;
+            let z = boardPosition.z;
             let canPlace = true;
             while (canPlace) {
-                position.x += direction.x;
-                position.z += direction.z;
-                canPlace = createMarker(game, position.x, position.z, true);
+                x += direction.x;
+                z += direction.z;
+                canPlace = checkCanMove(game, x, z, true, move => moves.push(move));
             }
         }
+        return moves;
     }
 
-    function createQueenMarkers(game: GameBoard, boardPosition: VectorXZ) {
+    function createQueenMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+        const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1},
             {x: 1, z: 1}, {x: -1, z: 1}, {x: 1, z: -1}, {x: -1, z: -1}
         ];
         
         for (const direction of directions) {
-            let position: VectorXZ = {x: boardPosition.x, z: boardPosition.z};
+            let x = boardPosition.x;
+            let z = boardPosition.z;
             let canPlace = true;
             while (canPlace) {
-                position.x += direction.x;
-                position.z += direction.z;
-                canPlace = createMarker(game, position.x, position.z, true);
+                x += direction.x;
+                z += direction.z;
+                canPlace = checkCanMove(game, x, z, true, move => moves.push(move));
             }
         }
+        return moves;
     }
 
-    function createKingMarkers(game: GameBoard, boardPosition: VectorXZ) {
+    function createKingMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+        const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1},
             {x: 1, z: 1}, {x: -1, z: 1}, {x: 1, z: -1}, {x: -1, z: -1}
         ];
         
         for (const direction of directions) {
-            let position: VectorXZ = {x: boardPosition.x, z: boardPosition.z};
-            position.x += direction.x;
-            position.z += direction.z;
-            createMarker(game, position.x, position.z, true);
+            const x = boardPosition.x + direction.x;
+            const z = boardPosition.z + direction.z;
+            //FIXME: verify move would not cause a check/checkmate.
+            checkCanMove(game, x, z, true, move => moves.push(move));
+        }
+        return moves;
+    }
+
+    const enum KingState {
+        Safe,
+        Check,
+        CheckMate,
+        Trapped
+    }
+
+    function isKingInCheck(game: GameBoard, kingPiece: ChessPieceComponent, atPosition: VectorXZ): KingState {
+        const possibleEnemyMoves: PossiblePieceMove[] = [];
+        for (const entity of getGameEntities(game)) {
+            const pieceComponent = system.getComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece);
+            if (!pieceComponent || pieceComponent.colour === kingPiece.colour) continue;
+
+            const position = system.getComponent(entity, MinecraftComponent.Position);
+            const gameBoardPosition = getBoardPosition(game, position.x, position.z);
+            possibleEnemyMoves.push(...getPieceMoves(game, pieceComponent, gameBoardPosition));
+        }
+
+        const availableKingMoves = getPieceMoves(game, kingPiece, atPosition);
+        const isCheck = possibleEnemyMoves.some(enemyMove => enemyMove.x === atPosition.x && enemyMove.z === atPosition.z);
+        const canKingMove = availableKingMoves.filter(kingMove => !possibleEnemyMoves.some(enemyMove => enemyMove.x === kingMove.x && enemyMove.z === kingMove.z));
+        //FIXME: verify that an attack by the king wouldn't result in the king being in check.
+
+        if (isCheck) {
+            if (!canKingMove) {
+                return KingState.CheckMate;
+            } else {
+                return KingState.Check;
+            }
+        } else {
+            if (canKingMove) {
+                return KingState.Safe;
+            } else {
+                return KingState.Trapped;
+            }
         }
     }
 
-    function createKnightMarkers(game: GameBoard, boardPosition: VectorXZ) {
+    function createKnightMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+        const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: -1, z: -2}, {x: 1, z: -2}, {x: -2, z: -1}, {x: 2, z: -1},
             {x: -2, z: 1}, {x: 2, z: 1}, {x: -1, z: 2}, {x: 1, z: 2}
-        ];        
+        ];
         
         for (const direction of directions) {
-            let position: VectorXZ = {x: boardPosition.x, z: boardPosition.z};
-            position.x += direction.x;
-            position.z += direction.z;
-            createMarker(game, position.x, position.z, true);
+            const x = boardPosition.x + direction.x;
+            const z = boardPosition.z + direction.z;
+            checkCanMove(game, x, z, true, move => moves.push(move));
         }
+        return moves;
     }
 
     function removeMarkers(game: GameBoard) {
@@ -247,20 +450,8 @@ namespace Server {
         return null;
     }
 
-    function createMarker(game: GameBoard, x: number, z: number, canAttack?: boolean): boolean {
-        if (x < 0 || x >= 8) return false;
-        if (z < 0 || z >= 8) return false;
-        //FIXME: Verify can place marker.
-        const piece = getPieceAtBoardLocation(game, x, z);
-        if (!!piece) {
-            if (canAttack) {
-                //FIXME: Place attack marker.
-            }
-            //Cannot proceed past this piece
-            return false;
-        }
-
-        const worldPosition = getEntityWorldPosition(game, x, z);
+    function createMarker(game: GameBoard, move: PossiblePieceMove): boolean {
+        const worldPosition = getEntityWorldPosition(game, move.x, move.z);
 
         const entity = system.createEntity(EntityType.Entity, MARKER_ENTITY);
         const position = system.getComponent(entity, MinecraftComponent.Position);
@@ -269,10 +460,13 @@ namespace Server {
      
         position.x = worldPosition.x;
         position.y = gameYLevel + 1;
+        if (move.type === MoveType.Attack) {
+            position.y += 2;
+        }
         position.z = worldPosition.z;
         marker.position = {
-            x: x,
-            z: z
+            x: move.x,
+            z: move.z
         };
 
         system.applyComponentChanges(position);
@@ -350,12 +544,35 @@ namespace Server {
             waitingGameBoard = createGameBoard({
                 x: furthestExaminedLocation.x + 1,
                 z: furthestExaminedLocation.z
-            });            
+            });
             gameBoards.push(waitingGameBoard);
-
         }
 
-        return waitingGameBoard;        
+        return waitingGameBoard;
+    }
+
+    function getGameEntities(game: GameBoard) {
+        const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
+        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
+        return entities.filter(entity => 
+            !!system.getComponent(entity, ChessComponents.ChessPiece) ||
+            !!system.getComponent(entity, ChessComponents.Marker)
+        );
+    }
+
+    function getEntitiesOnGameBoard(game: GameBoard) {
+        const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
+        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
+        return entities.filter(entity => entity.__identifier__ !== "minecraft:player");
+    }
+
+    function findPieces(game: GameBoard, colour: PieceColour, piece: Piece) {
+        const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
+        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
+        return entities.filter(entity => {
+            const pieceComponent = system.getComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece);
+            return !!pieceComponent && pieceComponent.colour === colour && pieceComponent.type == piece;
+        });
     }
 
     function createGameBoard(location: VectorXZ) {
@@ -367,7 +584,9 @@ namespace Server {
                 
             ],
             highlightedBlock: null,
-            selectedPiece: null
+            selectedPiece: null,
+            currentPlayerColour: PieceColour.White,
+            isComplete: false
         }
 
         const startX = (distanceBetweenGames * location.x);
@@ -384,12 +603,11 @@ namespace Server {
             }
         }
 
+        //FIXME: Split up White and black to allow switching sets
         const playerAPieceSet = pieceSets.filter(ps => ps.name === PieceSetName.Overworld)[0];
         const playerBPieceSet = pieceSets.filter(ps => ps.name === PieceSetName.Overworld)[0];
 
-        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
-        for (const entity of entities) {
-            if (entity.__identifier__ === "minecraft:player") continue;
+        for (const entity of getEntitiesOnGameBoard(gameBoard)) {
             system.destroyEntity(entity);
         }
 
