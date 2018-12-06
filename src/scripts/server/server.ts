@@ -5,6 +5,7 @@ import { ChessEvents, NotifyMouseCursor } from '../events';
 import { PlayerLocation, VectorXZ, VectorXYZ } from '../maths';
 
 //TODO: It's getting to a point where GameState should probably be it's own class.
+//TODO: Also simplify the GameState and GameInstance interface, there's no good reason to have a distinction between them.
 
 namespace Server {
     const distanceBetweenGames: number = 32;
@@ -51,12 +52,8 @@ namespace Server {
         });
     }
 
-    function getOppositeColour(colour: PieceColour): PieceColour {
-        return colour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
-    }
-
     function findPieceById(gameState: GameState, id: number) {
-        const locatedPieces = gameState.pieces.black.concat(gameState.pieces.white).filter(p => p.entity.id === id);
+        const locatedPieces = allPieces(gameState).filter(p => p.entity.id === id);
         if (locatedPieces.length == 0) return null;
         if (locatedPieces.length > 1) {
             system.broadcastEvent(SendToMinecraftServer.DisplayChat, "Apparently more than piece was matched by ID... how...?");
@@ -183,13 +180,13 @@ namespace Server {
     }
 
     function updateAvailableMoves(gameState: GameState, ...locations: VectorXZ[]) {
-        const allPieces = gameState.pieces.black.concat(gameState.pieces.white);
+        const gamePieces = allPieces(gameState);
 
         const piecesToUpdate = locations
-            .map(l => allPieces.filter(p => p.availableMoves.some(am => am.x === l.x && am.z === l.z)))
+            .map(l => gamePieces.filter(p => p.availableMoves.some(am => am.x === l.x && am.z === l.z)))
             .filter((val, index, self) => self.indexOf(val) === index)
             .reduce((p, c) => [...p, ...c], [])
-            .concat(allPieces.filter(p => p.availableMoves.length === 0));
+            .concat(gamePieces.filter(p => p.availableMoves.length === 0));
 
         for (const piece of piecesToUpdate) {
             updatePieceMoves(gameState, piece);
@@ -509,6 +506,7 @@ namespace Server {
             x: move.x,
             z: move.z
         };
+        //FIXME: marker rotations
 
         system.applyComponentChanges(position);
         system.applyComponentChanges(rotation);
@@ -566,6 +564,7 @@ namespace Server {
         setPlayerNumber(player, game.players.length, game);
         
         if (game.players.length == 2) {
+            //FIXME:? Technically there's no reason to update the moves here, the set of starting moves is always well defined.
             updateAvailableMoves(gameState);
             system.broadcastEvent(ChessEvents.GameStarting, game);
         }
@@ -603,15 +602,6 @@ namespace Server {
         return waitingGameBoard;
     }
 
-    function getGameEntities(game: GameInstance) {
-        const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
-        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
-        return entities.filter(entity => 
-            !!system.getComponent(entity, ChessComponents.ChessPiece) ||
-            !!system.getComponent(entity, ChessComponents.Marker)
-        );
-    }
-
     function getGameState(game: GameInstance): GameState {
         const gameState: GameState = {
             game: game,
@@ -630,7 +620,6 @@ namespace Server {
                 const playfieldEntity: EntityNearPlayfield = {
                     entity: entity,
                     type: "other",
-                    //worldPosition: position,
                     boardPosition: getBoardPosition(game, position.x, position.z)
                 }
                 if (entity.__identifier__ === "minecraft:player") {
