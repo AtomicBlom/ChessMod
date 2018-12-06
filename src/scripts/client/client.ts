@@ -2,7 +2,7 @@
 
 import { ChessEvents, SetPlayerNumberData, ChessUIEvents, UIEventData, MouseMoveUIEventData, NotifyMouseCursor } from '../events';
 import { PlayerLocation } from '../maths';
-import { GameBoard } from '../chess'
+import { GameInstance } from '../chess'
 
 namespace Client {
     const system = client.registerSystem(0, 0);
@@ -10,7 +10,7 @@ namespace Client {
     let playerNumber: number = null;
     let playerLocation: PlayerLocation;
     let pickHitLocation: {X: number, Y: number, Z: number} = null;
-    let gameBoard: GameBoard;
+    let gameBoard: GameInstance;
 
     // Setup which events to listen for
     system.initialize = function () {
@@ -56,7 +56,7 @@ namespace Client {
         thisClient = eventData;
     }
 
-    function onGameStarting(game: GameBoard) {
+    function onGameStarting(game: GameInstance) {
         if (!game.players.some(p => p.id === thisClient.id)) return;
         gameBoard = game;
         unloadUI(UI.Lobby);

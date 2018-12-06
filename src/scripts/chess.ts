@@ -37,12 +37,70 @@ export const enum PieceColour {
     White = "white"
 }
 
-export interface GameBoard {
-    selectedPiece: IEntityObject;
+export interface GameInstance {
+    selectedPiece: GamePieceEntity;
     location: VectorXZ;
     hasStarted: boolean;
     players: IEntityObject[];
     currentPlayerColour: PieceColour;
     highlightedBlock: VectorXZ;
     isComplete: boolean;
+}
+    
+export interface EntityNearPlayfield {
+    entity: IEntityObject;
+    type: "player" | "marker" | "piece" | "other";
+    //worldPosition: IPositionComponent;
+    boardPosition: VectorXZ; 
+}
+
+export interface GamePieceEntity extends EntityNearPlayfield {
+    type: "piece";
+    piece: ChessPieceComponent
+}
+
+export interface MarkerEntity extends EntityNearPlayfield {
+    type: "marker";
+}
+
+export interface GameState {
+    game: GameInstance;
+    pieces: {
+        'white': GamePieceEntity[];
+        'black': GamePieceEntity[];
+    };
+    otherEntities: EntityNearPlayfield[];
+    markers: MarkerEntity[]
+}
+
+export const enum ChessComponents {
+    ChessPiece = "chess:chess_piece",
+    Marker = "chess:marker"
+}
+export interface MarkerComponent {
+    position: VectorXZ;
+}
+export interface ChessPieceComponent {
+    type: Piece;
+    colour: PieceColour;
+    forwardVectorZ: 1 | -1;
+}
+
+export interface PossiblePieceMove {
+    x: number,
+    z: number,
+    type: MoveType,
+}
+
+export const enum KingState {
+    Safe,
+    Check,
+    CheckMate,
+    Trapped
+}
+
+export const enum MoveType {
+    Blocked = 'blocked',
+    Attack = 'attack',
+    Empty = 'empty'
 }

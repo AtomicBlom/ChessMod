@@ -1,6 +1,6 @@
 ///<reference types="minecraft-scripting-types-server" />
 
-import { GameBoard, PieceSet, PieceSetName, Piece, PieceColour } from '../chess';
+import { GameInstance, PieceSet, PieceSetName, Piece, PieceColour, GameState, MarkerComponent, ChessComponents, ChessPieceComponent, MoveType, PossiblePieceMove, KingState, EntityNearPlayfield, GamePieceEntity, MarkerEntity } from '../chess';
 import { ChessEvents, NotifyMouseCursor } from '../events';
 import { PlayerLocation, VectorXZ, VectorXYZ } from '../maths';
 
@@ -11,7 +11,7 @@ namespace Server {
 
     const system = server.registerSystem(0, 0);
 
-    const gameBoards: GameBoard[] = [];
+    const gameInstances: GameState[] = [];
     const pieceSets: PieceSet[] = [
         {
             name: PieceSetName.Overworld,
@@ -49,14 +49,37 @@ namespace Server {
         });
     }
 
+    function getOppositeColour(colour: PieceColour): PieceColour {
+        return colour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
+    }
+
+    function findPieceById(gameState: GameState, id: number) {
+        const locatedPieces = gameState.pieces.black.concat(gameState.pieces.white).filter(p => p.entity.id === id);
+        if (locatedPieces.length == 0) return null;
+        if (locatedPieces.length > 1) {
+            system.broadcastEvent(SendToMinecraftServer.DisplayChat, "Apparently more than piece was matched by ID... how...?");
+        }
+        return locatedPieces[0];
+    }
+
+    function findMarkerById(gameState: GameState, id: number) {
+        const locatedMarkers = gameState.markers.filter(p => p.entity.id === id);
+        if (locatedMarkers.length == 0) return null;
+        if (locatedMarkers.length > 1) {
+            system.broadcastEvent(SendToMinecraftServer.DisplayChat, "Apparently more than marker was matched by ID... how...?");
+        }
+        return locatedMarkers[0];
+    }
+
     function onPlayerAttack(eventData: IPlayerAttackedActorEventData) {
-        const playerGames = gameBoards.filter(gb => gb.players.some(p => p.id === eventData.player.id));
+        const playerGames = gameInstances.filter(gb => gb.game.players.some(p => p.id === eventData.player.id));
         if (playerGames.length === 0) {
             system.broadcastEvent(SendToMinecraftServer.DisplayChat, `You are not in a game`);
             return;
         };
 
-        const game = playerGames[0];
+        const gameState = playerGames[0];
+        const game = gameState.game;
         if (game.isComplete) {
             return;
         }
@@ -67,14 +90,17 @@ namespace Server {
             return;
         }
 
-        const health = system.getComponent(eventData.attacked_entity, MinecraftComponent.Health);
-        health.health = health.maxHealth;
-        system.applyComponentChanges(health);
+        const attackedPiece = findPieceById(gameState, eventData.attacked_entity.id);
+        
 
-        const chessPiece = system.getComponent<ChessPieceComponent>(eventData.attacked_entity, ChessComponents.ChessPiece);
-        if (!!chessPiece) {
-            const position = system.getComponent(eventData.attacked_entity, MinecraftComponent.Position);
-            const boardPosition = getBoardPosition(game, position.x, position.z);
+        // const health = system.getComponent(eventData.attacked_entity, MinecraftComponent.Health);
+        // health.health = health.maxHealth;
+        // system.applyComponentChanges(health);
+
+        //The user selected a game piece.
+        if (!!attackedPiece) {
+            const chessPiece = attackedPiece.piece;
+            const boardPosition = attackedPiece.boardPosition;
             if (!boardPosition) return;
 
             if (!game.selectedPiece) {
@@ -89,13 +115,14 @@ namespace Server {
                     return;
                 };
                 system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Selected ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
-                game.selectedPiece = eventData.attacked_entity;
-                createMarkers(game, chessPiece, boardPosition);
+                game.selectedPiece = attackedPiece;
+                createMarkers(gameState, chessPiece, boardPosition);
             } else {
                 //FIXME: allow castling
-                if (game.selectedPiece.id === eventData.attacked_entity.id) {
+                //Player selected the same entity again, cancel the move.
+                if (game.selectedPiece.entity.id === eventData.attacked_entity.id) {
                     game.selectedPiece = null;
-                    removeMarkers(game);
+                    removeMarkers(gameState);
                     system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cancelled move for ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
                     return;
                 }
@@ -105,39 +132,41 @@ namespace Server {
                     return;
                 } else {
                     system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Attacking ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
-                    if (attackPiece(game, eventData.attacked_entity)) {
-                        updateTurn(game);
+                    if (attackPiece(gameState, attackedPiece)) {
+                        updateTurn(gameState);
                     }
                 }
             }
-        } else if (!!game.selectedPiece && !!system.getComponent(eventData.attacked_entity, ChessComponents.Marker)) {
-            const position = system.getComponent(eventData.attacked_entity, MinecraftComponent.Position);
-            const boardPosition = getBoardPosition(game, position.x, position.z);
-            if (!!boardPosition) {
-                system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Moving piece to ${boardPosition.x},${boardPosition.z}`);
-
-                if (movePiece(game, game.selectedPiece, boardPosition)) {
-                    updateTurn(game);
-                };
+        } else if (!!game.selectedPiece) {
+            //We're trying to identify what they want to do with the piece.
+            const marker = findMarkerById(gameState, eventData.attacked_entity.id);
+            if (!!marker) {
+                const boardPosition = marker.boardPosition;
+                if (!!boardPosition) {
+                    system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Moving piece to ${boardPosition.x},${boardPosition.z}`);
+    
+                    if (movePiece(gameState, game.selectedPiece, boardPosition)) {
+                        updateTurn(gameState);
+                    };
+                }
             }
         }
+        
     }
 
-    function updateTurn(game: GameBoard) {
-        removeMarkers(game);
+    function updateTurn(gameState: GameState) {
+        removeMarkers(gameState);
+        const game = gameState.game;
         game.selectedPiece = null;
         const previousPlayerColour = game.currentPlayerColour;
         game.currentPlayerColour = game.currentPlayerColour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
 
-        const pieces = findPieces(game, game.currentPlayerColour, Piece.King);
+        const pieces = gameState.pieces[game.currentPlayerColour].filter(p => p.piece.type === Piece.King);
         if (pieces.length !== 0) {
             //Should always be the case. don't allow players to actually kill the king.
             const king = pieces[0];
-            const kingPieceComponent = system.getComponent<ChessPieceComponent>(king, ChessComponents.ChessPiece);
-            const kingPiecePosition = system.getComponent(king, MinecraftComponent.Position);
-            const kingBoardPosition = getBoardPosition(game, kingPiecePosition.x, kingPiecePosition.z);
 
-            const kingState = isKingInCheck(game, kingPieceComponent, kingBoardPosition);
+            const kingState = isKingInCheck(game, king.piece, king.boardPosition);
             if (kingState === KingState.CheckMate) {
                 game.isComplete = true;
                 system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${previousPlayerColour} has won the game`);
@@ -148,21 +177,18 @@ namespace Server {
         system.broadcastEvent(SendToMinecraftServer.DisplayChat, `It is now ${game.currentPlayerColour}'s turn`);
     }
 
-    function movePiece(game: GameBoard, entity: IEntityObject, boardPosition: VectorXZ) {
-        const worldPosition = getEntityWorldPosition(game, boardPosition.x, boardPosition.z);
-
-        const selectedPiece = system.getComponent<ChessPieceComponent>(game.selectedPiece, ChessComponents.ChessPiece);
-        const selectedPiecePositionComponent = system.getComponent(game.selectedPiece, MinecraftComponent.Position);
-        const selectedPieceBoardPosition = getBoardPosition(game, selectedPiecePositionComponent.x, selectedPiecePositionComponent.z);
-        const move = getPieceMoves(game, selectedPiece, selectedPieceBoardPosition)
-                        .filter(move => move.x === boardPosition.x && move.z === boardPosition.z);
+    function movePiece(gameState: GameState, entity: GamePieceEntity, newBoardPosition: VectorXZ) {
+        const move = getPieceMoves(gameState.game, entity.piece, entity.boardPosition)
+                        .filter(move => move.x === newBoardPosition.x && move.z === newBoardPosition.z);
 
         //FIXME: Manage if user clicked on a marker that was actually an attack.
         if (move.length > 0 && move[0].type === MoveType.Empty) {
-            const position = system.getComponent(entity, MinecraftComponent.Position);
-            position.x = worldPosition.x;
-            position.z = worldPosition.z;
-            system.applyComponentChanges(position);
+            const worldPositionComponent = system.getComponent(entity.entity, MinecraftComponent.Position);
+            const worldPosition = getEntityWorldPosition(gameState.game, newBoardPosition.x, newBoardPosition.z);
+            worldPositionComponent.x = worldPosition.x;
+            worldPositionComponent.z = worldPosition.z;
+            entity.boardPosition = newBoardPosition;
+            system.applyComponentChanges(worldPositionComponent);
 
             //FIXME: if piece was a pawn, allow them to select a piece.
             return true;
@@ -170,33 +196,33 @@ namespace Server {
         return false;
     }
 
-    function attackPiece(game: GameBoard, attackedEntity: IEntityObject) {
-        const attackedPiecePosition = system.getComponent(attackedEntity, MinecraftComponent.Position);
-        const attackBoardPosition = getBoardPosition(game, attackedPiecePosition.x, attackedPiecePosition.z);
-
-        const selectedPiece = system.getComponent<ChessPieceComponent>(game.selectedPiece, ChessComponents.ChessPiece);
-        const selectedPiecePositionComponent = system.getComponent(game.selectedPiece, MinecraftComponent.Position);
-        const selectedPieceBoardPosition = getBoardPosition(game, selectedPiecePositionComponent.x, selectedPiecePositionComponent.z);
-        const move = getPieceMoves(game, selectedPiece, selectedPieceBoardPosition)
-                        .filter(move => move.x === attackBoardPosition.x && move.z === attackBoardPosition.z);
+    function attackPiece(gameState: GameState, attackedEntity: GamePieceEntity) {
+        const game = gameState.game;
+        const selectedPiece = gameState.game.selectedPiece;
+        const move = getPieceMoves(game, selectedPiece.piece, game.selectedPiece.boardPosition)
+                        .filter(move => move.x === attackedEntity.boardPosition.x && move.z === attackedEntity.boardPosition.z);
 
         if (move.length > 0 && move[0].type === MoveType.Attack) {
-            //FIXME: Rather than remove, move the piece off to the side.
-            system.destroyEntity(attackedEntity);
-
             //Move the attacking piece
-            const worldPosition = getEntityWorldPosition(game, attackBoardPosition.x, attackBoardPosition.z);
-            const position = system.getComponent(game.selectedPiece, MinecraftComponent.Position);
-            position.x = worldPosition.x;
-            position.z = worldPosition.z;
-            system.applyComponentChanges(position);
+            const worldPositionComponent = system.getComponent(selectedPiece.entity, MinecraftComponent.Position);
+            const worldPosition = getEntityWorldPosition(game, attackedEntity.boardPosition.x, attackedEntity.boardPosition.z);
+            worldPositionComponent.x = worldPosition.x;
+            worldPositionComponent.z = worldPosition.z;
+            selectedPiece.boardPosition.x = attackedEntity.boardPosition.x;
+            selectedPiece.boardPosition.z = attackedEntity.boardPosition.z;
+
+            //FIXME: Rather than remove, move the piece off to the side.
+            gameState.pieces[attackedEntity.piece.colour] = gameState.pieces[attackedEntity.piece.colour].filter(p => p.entity.id === attackedEntity.entity.id)
+            system.destroyEntity(attackedEntity.entity);
+
+            system.applyComponentChanges(worldPositionComponent);
             return true;
         }
         return false;
 
     }
 
-    function getBoardPosition(game: GameBoard, worldX: number, worldZ: number) {
+    function getBoardPosition(game: GameInstance, worldX: number, worldZ: number) {
         const startX = (game.location.x * distanceBetweenGames);
         const startZ = (game.location.z * distanceBetweenGames);
 
@@ -209,7 +235,7 @@ namespace Server {
         return boardPosition;
     }
 
-    function getWorldPosition(game: GameBoard, boardX: number, boardZ: number) {
+    function getWorldPosition(game: GameInstance, boardX: number, boardZ: number) {
         if (boardX < 0 || boardX >= 8) return null;
         if (boardZ < 0 || boardZ >= 8) return null;
 
@@ -223,7 +249,7 @@ namespace Server {
         return worldPosition;
     }
 
-    function getEntityWorldPosition(game: GameBoard, boardX: number, boardZ: number) {
+    function getEntityWorldPosition(game: GameInstance, boardX: number, boardZ: number) {
         var worldPosition = getWorldPosition(game, boardX, boardZ);
         if (!worldPosition) return null;
 
@@ -235,13 +261,13 @@ namespace Server {
         return entityPosition;
     }
 
-    function createMarkers(game: GameBoard, piece: ChessPieceComponent, boardPosition: VectorXZ) {
-        for (const move of getPieceMoves(game, piece, boardPosition)) {
-            createMarker(game, move);
+    function createMarkers(gameState: GameState, piece: ChessPieceComponent, boardPosition: VectorXZ) {
+        for (const move of getPieceMoves(gameState.game, piece, boardPosition)) {
+            createMarker(gameState, move);
         }
     }
 
-    function getPieceMoves(game: GameBoard, piece: ChessPieceComponent, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function getPieceMoves(game: GameInstance, piece: ChessPieceComponent, boardPosition: VectorXZ): PossiblePieceMove[] {
         switch(piece.type) {
             case Piece.Pawn:
                 return createPawnMarkers(game, boardPosition, piece.forwardVectorZ);
@@ -259,19 +285,7 @@ namespace Server {
         return [];
     }
 
-    interface PossiblePieceMove {
-        x: number,
-        z: number,
-        type: MoveType,
-    }
-
-    const enum MoveType {
-        Blocked = 'blocked',
-        Attack = 'attack',
-        Empty = 'empty'
-    }
-
-    function checkCanMove(game: GameBoard, x: number, z: number, canAttack: boolean, addItem: (possiblePieceMove: PossiblePieceMove) => void): boolean {
+    function checkCanMove(game: GameInstance, x: number, z: number, canAttack: boolean, addItem: (possiblePieceMove: PossiblePieceMove) => void): boolean {
         if (x < 0 || x >= 8) return false;
         if (z < 0 || z >= 8) return false;
 
@@ -293,7 +307,7 @@ namespace Server {
         return true;
     }
 
-    function createPawnMarkers(game: GameBoard, boardPosition: VectorXZ, forwardVectorZ: number): PossiblePieceMove[] {
+    function createPawnMarkers(game: GameInstance, boardPosition: VectorXZ, forwardVectorZ: number): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         let canPlace = true;
 
@@ -306,7 +320,7 @@ namespace Server {
         return moves;
     }
 
-    function createBishopMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function createBishopMarkers(game: GameInstance, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [{x: 1, z: 1}, {x: -1, z: 1}, {x: 1, z: -1}, {x: -1, z: -1}];
 
@@ -322,7 +336,7 @@ namespace Server {
         return moves;
     }
 
-    function createRookMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function createRookMarkers(game: GameInstance, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [{x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1}];
         
@@ -339,7 +353,7 @@ namespace Server {
         return moves;
     }
 
-    function createQueenMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function createQueenMarkers(game: GameInstance, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1},
@@ -359,7 +373,7 @@ namespace Server {
         return moves;
     }
 
-    function createKingMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function createKingMarkers(game: GameInstance, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1},
@@ -375,14 +389,7 @@ namespace Server {
         return moves;
     }
 
-    const enum KingState {
-        Safe,
-        Check,
-        CheckMate,
-        Trapped
-    }
-
-    function isKingInCheck(game: GameBoard, kingPiece: ChessPieceComponent, atPosition: VectorXZ): KingState {
+    function isKingInCheck(game: GameInstance, kingPiece: ChessPieceComponent, atPosition: VectorXZ): KingState {
         const possibleEnemyMoves: PossiblePieceMove[] = [];
         for (const entity of getGameEntities(game)) {
             const pieceComponent = system.getComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece);
@@ -413,7 +420,7 @@ namespace Server {
         }
     }
 
-    function createKnightMarkers(game: GameBoard, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function createKnightMarkers(game: GameInstance, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: -1, z: -2}, {x: 1, z: -2}, {x: -2, z: -1}, {x: 2, z: -1},
@@ -428,16 +435,14 @@ namespace Server {
         return moves;
     }
 
-    function removeMarkers(game: GameBoard) {
-        const worldPosition = getWorldPosition(game, 0, 0);
-        const entities = system.getEntitiesFromSpatialView(spatialView, worldPosition.x - 8, 0, worldPosition.z, worldPosition.x + 16 + 8, 16, worldPosition.z + 16 + 8);
-        for (const entity of entities) {
-            if (!system.getComponent(entity, ChessComponents.Marker)) continue;
-            system.destroyEntity(entity);
+    function removeMarkers(game: GameState) {
+        for (const marker of game.markers) {
+            system.destroyEntity(marker.entity);
         }
+        game.markers.length = 0;
     }
 
-    function getPieceAtBoardLocation(game: GameBoard, x: number, z: number) {
+    function getPieceAtBoardLocation(game: GameInstance, x: number, z: number) {
         const worldPosition = getWorldPosition(game, x, z);
         const entities = system.getEntitiesFromSpatialView(
             spatialView, 
@@ -450,8 +455,8 @@ namespace Server {
         return null;
     }
 
-    function createMarker(game: GameBoard, move: PossiblePieceMove): boolean {
-        const worldPosition = getEntityWorldPosition(game, move.x, move.z);
+    function createMarker(gameState: GameState, move: PossiblePieceMove): boolean {
+        const worldPosition = getEntityWorldPosition(gameState.game, move.x, move.z);
 
         const entity = system.createEntity(EntityType.Entity, MARKER_ENTITY);
         const position = system.getComponent(entity, MinecraftComponent.Position);
@@ -473,33 +478,42 @@ namespace Server {
         system.applyComponentChanges(rotation);
         system.applyComponentChanges(marker);
 
+        gameState.markers.push({
+            entity: entity,
+            type: "marker",
+            boardPosition: marker.position,
+            //worldPosition: position
+        })
+
         return true;
     }
 
     function onNotifyMouseCursor(eventData: NotifyMouseCursor) {
-        const gameBoard = gameBoards[eventData.gameId];
-        if (!gameBoard) return;
+        const gameState = gameInstances[eventData.gameId];
+        if (!gameState) return;
+        const game = gameState.game;
 
-        let highlightedBlock = gameBoard.highlightedBlock
+
+        let highlightedBlock = game.highlightedBlock
         
-        const boardPosition = getBoardPosition(gameBoard, eventData.x, eventData.z);
+        const boardPosition = getBoardPosition(game, eventData.x, eventData.z);
                 
         if (!!highlightedBlock) {
             if (!!boardPosition && (highlightedBlock.x == boardPosition.x && highlightedBlock.z == boardPosition.z)) return;
 
             const block = getBlockType(highlightedBlock);
-            const worldPosition = getWorldPosition(gameBoard, highlightedBlock.x, highlightedBlock.z)
+            const worldPosition = getWorldPosition(game, highlightedBlock.x, highlightedBlock.z)
             const command = `/fill ${worldPosition.x} ${gameYLevel} ${worldPosition.z} ${worldPosition.x + 1} ${gameYLevel} ${worldPosition.z + 1} ${block}`;
             executeCommand(command);
         }
 
         if (!!boardPosition) {
-            const worldPosition = getWorldPosition(gameBoard, boardPosition.x, boardPosition.z)
+            const worldPosition = getWorldPosition(game, boardPosition.x, boardPosition.z)
             
             const command = `/fill ${worldPosition.x} ${gameYLevel} ${worldPosition.z} ${worldPosition.x + 1} ${gameYLevel} ${worldPosition.z + 1} diamond_block`;
             executeCommand(command);
         }
-        gameBoards[0].highlightedBlock = boardPosition;
+        game.highlightedBlock = boardPosition;
     }
 
     function getBlockType(boardPosition: VectorXZ) {
@@ -509,7 +523,7 @@ namespace Server {
     }
 
     function onJoinNewGame(player: IEntityObject) {
-        const game = findNewGame();
+        const game = findNewGame().game;
         
         game.players.push(player);
 
@@ -520,7 +534,7 @@ namespace Server {
         }
     }
 
-    function setPlayerNumber(player: IEntityObject, playerNumber: number, game: GameBoard) {
+    function setPlayerNumber(player: IEntityObject, playerNumber: number, game: GameInstance) {
         const playerName = system.getComponent(player, MinecraftComponent.Nameable);
         const playerLocation: PlayerLocation = playerNumber == 1 ? {x: 7, y: 4, z: -2, rotation: 0} : {x: 7, y: 4, z: 18, rotation: 180}
         const movePlayerCommand = `/tp ${playerName.name} ${game.location.x * 32 + playerLocation.x} ${gameYLevel + playerLocation.y} ${game.location.z * 32 + playerLocation.z} ${playerLocation.rotation} 40`;
@@ -529,29 +543,30 @@ namespace Server {
     }
 
     function findNewGame() {
-        let waitingGameBoard: GameBoard = null;
+        let waitingGameBoard: GameState = null;
         let furthestExaminedLocation: VectorXZ = {x: -1, z: 0};
         
-        for (const gameBoard of gameBoards) {
-            furthestExaminedLocation = gameBoard.location;
-            if (gameBoard.players.length < 2 && !gameBoard.hasStarted) {
-                waitingGameBoard = gameBoard;
+        for (const gameState of gameInstances) {
+            const game = gameState.game;
+            furthestExaminedLocation = game.location;
+            if (game.players.length < 2 && !game.hasStarted) {
+                waitingGameBoard = gameState;
                 break;
             }
         }
 
         if (waitingGameBoard == null) {
-            waitingGameBoard = createGameBoard({
+            waitingGameBoard = createGame({
                 x: furthestExaminedLocation.x + 1,
                 z: furthestExaminedLocation.z
             });
-            gameBoards.push(waitingGameBoard);
+            gameInstances.push(waitingGameBoard);
         }
 
         return waitingGameBoard;
     }
 
-    function getGameEntities(game: GameBoard) {
+    function getGameEntities(game: GameInstance) {
         const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
         const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
         return entities.filter(entity => 
@@ -560,24 +575,56 @@ namespace Server {
         );
     }
 
-    function getEntitiesOnGameBoard(game: GameBoard) {
-        const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
-        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
-        return entities.filter(entity => entity.__identifier__ !== "minecraft:player");
-    }
+    function getGameState(game: GameInstance): GameState {
+        const gameState: GameState = {
+            game: game,
+            markers: [],
+            pieces: {
+                white: [],
+                black: []
+            },
+            otherEntities: []
+        };
 
-    function findPieces(game: GameBoard, colour: PieceColour, piece: Piece) {
         const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
-        const entities = system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8);
-        return entities.filter(entity => {
-            const pieceComponent = system.getComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece);
-            return !!pieceComponent && pieceComponent.colour === colour && pieceComponent.type == piece;
-        });
-    }
+        system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8)
+            .forEach(entity => {
+                const position = system.getComponent(entity, MinecraftComponent.Position);
+                const playfieldEntity: EntityNearPlayfield = {
+                    entity: entity,
+                    type: "other",
+                    //worldPosition: position,
+                    boardPosition: getBoardPosition(game, position.x, position.z)
+                }
+                if (entity.__identifier__ === "minecraft:player") {
+                    return;
+                } else {
+                    const piece = system.getComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece);
+                    if (!!piece) {
+                        const gamePieceEntity = <GamePieceEntity>playfieldEntity;
+                        playfieldEntity.type = "piece"
+                        gamePieceEntity.piece = piece;
+                        gameState.pieces[piece.colour].push(gamePieceEntity);
+                        return;
+                    } else {
+                        const marker = system.getComponent<MarkerComponent>(entity, ChessComponents.Marker);
+                        if (!!marker) {
+                            playfieldEntity.type = "marker";
+                            gameState.markers.push(<MarkerEntity>playfieldEntity);
+                            return;
+                        }
+                    }
+                }
 
-    function createGameBoard(location: VectorXZ) {
+                gameState.otherEntities.push(playfieldEntity);
+            });
+
+        return <GameState>gameState;
         
-        const gameBoard: GameBoard = {
+    }
+
+    function createGame(location: VectorXZ): GameState {
+        const gameBoard: GameInstance = {
             hasStarted: false,
             location: location, 
             players: [
@@ -603,57 +650,44 @@ namespace Server {
             }
         }
 
-        //FIXME: Split up White and black to allow switching sets
-        const playerAPieceSet = pieceSets.filter(ps => ps.name === PieceSetName.Overworld)[0];
-        const playerBPieceSet = pieceSets.filter(ps => ps.name === PieceSetName.Overworld)[0];
+        const state = getGameState(gameBoard);
 
-        for (const entity of getEntitiesOnGameBoard(gameBoard)) {
-            system.destroyEntity(entity);
+        for (const entity of state.otherEntities) {
+            system.destroyEntity(entity.entity);
         }
+        state.otherEntities.length = 0;
 
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Rook  , PieceColour.White, 0, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Knight, PieceColour.White, 1, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Bishop, PieceColour.White, 2, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.King  , PieceColour.White, 3, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Queen , PieceColour.White, 4, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Bishop, PieceColour.White, 5, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Knight, PieceColour.White, 6, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Rook  , PieceColour.White, 7, 0);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 0, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 1, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 2, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 3, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 4, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 5, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 6, 1);
-        spawnPiece(gameBoard, playerAPieceSet, Piece.Pawn  , PieceColour.White, 7, 1);
+        createPieceSet(state, PieceColour.Black, pieceSets[0]);
+        createPieceSet(state, PieceColour.White, pieceSets[0]);
 
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Rook  , PieceColour.Black, 0, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Knight, PieceColour.Black, 1, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Bishop, PieceColour.Black, 2, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.King  , PieceColour.Black, 3, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Queen , PieceColour.Black, 4, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Bishop, PieceColour.Black, 5, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Knight, PieceColour.Black, 6, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Rook  , PieceColour.Black, 7, 7);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 0, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 1, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 2, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 3, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 4, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 5, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 6, 6);
-        spawnPiece(gameBoard, playerBPieceSet, Piece.Pawn  , PieceColour.Black, 7, 6)
-        return gameBoard;
+        return state;
     }
 
-    function spawnPiece(game: GameBoard, pieceSet: PieceSet, piece: Piece, colour: PieceColour, x: number, z: number) {
+    function createPieceSet(gameState: GameState, player: PieceColour, pieceSet: PieceSet) {
+
+        const frontRow = player === PieceColour.Black ? 6 : 1;
+        const rearRow = player === PieceColour.Black ? 7 : 0;
+
+        spawnPiece(gameState, pieceSet, Piece.Rook  , player, 0, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.Knight, player, 1, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.Bishop, player, 2, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.King  , player, 3, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.Queen , player, 4, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.Bishop, player, 5, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.Knight, player, 6, rearRow);
+        spawnPiece(gameState, pieceSet, Piece.Rook  , player, 7, rearRow);
+        for (let i = 0; i < 8; ++i) {
+            spawnPiece(gameState, pieceSet, Piece.Pawn, player, i, frontRow);
+        }
+    }
+
+    function spawnPiece(gameState: GameState, pieceSet: PieceSet, piece: Piece, colour: PieceColour, x: number, z: number) {
         const entity = system.createEntity(EntityType.Entity, pieceSet.pieces[piece]);
         const chessPiece = system.createComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece)
         const position = system.getComponent(entity, MinecraftComponent.Position);
         const rotation = system.getComponent(entity, MinecraftComponent.Rotation);
 
-        const worldPosition = getEntityWorldPosition(game, x, z);
+        const worldPosition = getEntityWorldPosition(gameState.game, x, z);
 
         chessPiece.type = piece;
         chessPiece.colour = colour;
@@ -666,22 +700,20 @@ namespace Server {
         system.applyComponentChanges(chessPiece);
         system.applyComponentChanges(position);
         system.applyComponentChanges(rotation);
+        
+        gameState.pieces[colour].push({
+            entity: entity,
+            boardPosition: {
+                x: x,
+                z: z,
+            },
+            piece: chessPiece,
+            type: "piece",
+            //worldPosition: worldPosition
+        })
     }
 
     function executeCommand(command: string) {
         system.broadcastEvent(SendToMinecraftServer.ExecuteCommand, command);
-    }
-
-    const enum ChessComponents {
-        ChessPiece = "chess:chess_piece",
-        Marker = "chess:marker"
-    }
-    interface MarkerComponent {
-        position: VectorXZ;
-    }
-    interface ChessPieceComponent {
-        type: Piece;
-        colour: PieceColour;
-        forwardVectorZ: 1 | -1;
     }
 }
