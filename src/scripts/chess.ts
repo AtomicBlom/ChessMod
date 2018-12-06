@@ -56,7 +56,8 @@ export interface EntityNearPlayfield {
 
 export interface GamePieceEntity extends EntityNearPlayfield {
     type: "piece";
-    piece: ChessPieceComponent
+    piece: ChessPieceComponent,
+    availableMoves: PossiblePieceMove[]
 }
 
 export interface MarkerEntity extends EntityNearPlayfield {
@@ -102,5 +103,6 @@ export const enum KingState {
 export const enum MoveType {
     Blocked = 'blocked',
     Attack = 'attack',
-    Empty = 'empty'
+    Empty = 'empty',
+    Guarding = 'guarding'
 }
