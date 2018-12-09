@@ -586,7 +586,7 @@ namespace Server {
     function setPlayerNumber(player: IEntityObject, playerNumber: number, game: GameInstance) {
         const playerName = system.getComponent(player, MinecraftComponent.Nameable);
         const playerLocation: PlayerLocation = playerNumber == 1 ? {x: 7, y: 4, z: -2, rotation: 0} : {x: 7, y: 4, z: 18, rotation: 180}
-        const movePlayerCommand = `/tp ${playerName.name} ${game.location.x * 32 + playerLocation.x} ${gameYLevel + playerLocation.y} ${game.location.z * 32 + playerLocation.z} ${playerLocation.rotation} 40`;
+        const movePlayerCommand = `/tp ${playerName.name} ${game.location.x * 32 + playerLocation.x + 0.5} ${gameYLevel + playerLocation.y} ${game.location.z * 32 + playerLocation.z} ${playerLocation.rotation} 40`;
         executeCommand(movePlayerCommand);
         system.broadcastEvent(ChessEvents.SetPlayerNumber, {player: player, number: playerNumber});
     }
@@ -688,6 +688,16 @@ namespace Server {
                 executeCommand(command);
             }
         }
+
+        executeCommand(`/fill ` +
+            `${startX * 32 + 7} ${gameYLevel + 3} ${startZ * 32 + -2} ` + 
+            `${startX * 32 + 8} ${gameYLevel + 3} ${startZ * 32 + -2} ` +
+            `concrete 0`);
+
+        executeCommand(`/fill ` +
+            `${startX * 32 + 7} ${gameYLevel + 3} ${startZ * 32 + 18} ` + 
+            `${startX * 32 + 8} ${gameYLevel + 3} ${startZ * 32 + 18} ` +
+            `concrete 15`)
 
         const state = getGameState(gameBoard);
 

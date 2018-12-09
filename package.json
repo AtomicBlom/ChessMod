@@ -10,8 +10,8 @@
   "devDependencies": {
     "gulp-typescript": "^5.0.0",
     "minecraft-scripting-toolchain": "^0.1.0",
-    "minecraft-scripting-types-client": "^0.2.0-alpha.1",
-    "minecraft-scripting-types-server": "^0.2.0-alpha.1",
+    "minecraft-scripting-types-client": "^0.2.0-alpha.2",
+    "minecraft-scripting-types-server": "^0.2.0-alpha.2",
     "typescript": "^3.2.2"
   },
   "dependencies": {}
