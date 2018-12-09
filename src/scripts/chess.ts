@@ -78,10 +78,10 @@ export const enum ChessComponents {
     ChessPiece = "chess:chess_piece",
     Marker = "chess:marker"
 }
-export interface MarkerComponent {
+export interface MarkerComponent extends IComponent {
     position: VectorXZ;
 }
-export interface ChessPieceComponent {
+export interface ChessPieceComponent extends IComponent {
     type: Piece;
     colour: PieceColour;
     forwardVectorZ: 1 | -1;

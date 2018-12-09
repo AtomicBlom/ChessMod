@@ -1,8 +1,8 @@
-///<reference types="minecraft-scripting-types-server" />
+/// <reference types="minecraft-scripting-types-server" />
 
 import { GameInstance, PieceSet, PieceSetName, Piece, PieceColour, GameState, MarkerComponent, ChessComponents, ChessPieceComponent, MoveType, PossiblePieceMove, KingState, EntityNearPlayfield, GamePieceEntity, MarkerEntity } from '../chess';
 import { ChessEvents, NotifyMouseCursor } from '../events';
-import { PlayerLocation, VectorXZ, VectorXYZ } from '../maths';
+import { PlayerLocation, VectorXZ } from '../maths';
 
 //TODO: It's getting to a point where GameState should probably be it's own class.
 //TODO: Also simplify the GameState and GameInstance interface, there's no good reason to have a distinction between them.
@@ -29,7 +29,7 @@ namespace Server {
         }
     ]
 
-    let spatialView: ISpatialView;
+    let positionQuery: IQuery;
 
     // Setup which events to listen for
     system.initialize = function () {
@@ -37,7 +37,7 @@ namespace Server {
         system.listenForEvent(ChessEvents.NotifyMouseCursor, onNotifyMouseCursor);
         system.listenForEvent(ReceiveFromMinecraftServer.PlayerAttackedActor, onPlayerAttack);
 
-        spatialView = system.registerSpatialView(MinecraftComponent.Position, "x", "y", "z");
+        positionQuery = system.registerQuery(MinecraftComponent.Position);
 
         system.registerComponent(ChessComponents.ChessPiece, <ChessPieceComponent>{
             type: Piece.King,
@@ -129,8 +129,9 @@ namespace Server {
                 //Create visual indicators of where they can move.
                 createMarkers(gameState, game.selectedPiece);
             } else {
+                const selectedPiece = game.selectedPiece;
                 //If the player selected the same entity again, cancel the move.
-                if (game.selectedPiece.entity.id === eventData.attacked_entity.id) {
+                if (selectedPiece.entity.id === eventData.attacked_entity.id) {
                     //Deselect the piece
                     game.selectedPiece = null;
                     //Clear any shown markers
@@ -149,9 +150,14 @@ namespace Server {
 
                 //Checks passed? Ok, let's attack!
                 system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Attacking ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
-                if (attackPiece(gameState, attackedPiece)) {
+                const originalPosition = {
+                    x: selectedPiece.boardPosition.x,
+                    z: selectedPiece.boardPosition.z
+                }
+                if (attackPiece(gameState, selectedPiece, attackedPiece)) {
                     //After the attack was successful, we need to refresh any pieces affected by the before and after locations of the selected piece.
-                    updateAvailableMoves(gameState, game.selectedPiece.boardPosition, boardPosition);
+                    updateAvailableMoves(gameState, originalPosition, boardPosition);
+                    updatePieceMoves(gameState, selectedPiece);
 
                     //Good, now switch players
                     updateTurn(gameState);
@@ -185,8 +191,7 @@ namespace Server {
         const piecesToUpdate = locations
             .map(l => gamePieces.filter(p => p.availableMoves.some(am => am.x === l.x && am.z === l.z)))
             .filter((val, index, self) => self.indexOf(val) === index)
-            .reduce((p, c) => [...p, ...c], [])
-            .concat(gamePieces.filter(p => p.availableMoves.length === 0));
+            .reduce((p, c) => [...p, ...c], []);
 
         for (const piece of piecesToUpdate) {
             updatePieceMoves(gameState, piece);
@@ -194,7 +199,7 @@ namespace Server {
     }
 
     function updatePieceMoves(gameState: GameState, piece: GamePieceEntity) {
-        piece.availableMoves = calculatePieceMoves(gameState, piece.piece, piece.boardPosition);
+        piece.availableMoves = calculatePieceMoves(gameState, piece);
     }
 
     function updateTurn(gameState: GameState) {
@@ -221,7 +226,7 @@ namespace Server {
     }
 
     function movePiece(gameState: GameState, entity: GamePieceEntity, newBoardPosition: VectorXZ) {
-        const move = calculatePieceMoves(gameState, entity.piece, entity.boardPosition)
+        const move = calculatePieceMoves(gameState, entity, entity.boardPosition)
                         .filter(move => move.x === newBoardPosition.x && move.z === newBoardPosition.z);
 
         //FIXME: Manage if user clicked on a marker that was actually an attack.
@@ -231,7 +236,7 @@ namespace Server {
             worldPositionComponent.x = worldPosition.x;
             worldPositionComponent.z = worldPosition.z;
             entity.boardPosition = newBoardPosition;
-            system.applyComponentChanges(worldPositionComponent);
+            system.applyComponentChanges(entity.entity, worldPositionComponent);
 
             //FIXME: if piece was a pawn, allow them to select a piece.
             return true;
@@ -239,26 +244,25 @@ namespace Server {
         return false;
     }
 
-    function attackPiece(gameState: GameState, attackedEntity: GamePieceEntity) {
+    function attackPiece(gameState: GameState, attackingEntity: GamePieceEntity, attackedEntity: GamePieceEntity) {
         const game = gameState.game;
-        const selectedPiece = gameState.game.selectedPiece;
-        const move = calculatePieceMoves(gameState, selectedPiece.piece, game.selectedPiece.boardPosition)
+        const move = calculatePieceMoves(gameState, attackingEntity, game.selectedPiece.boardPosition)
                         .filter(move => move.x === attackedEntity.boardPosition.x && move.z === attackedEntity.boardPosition.z);
 
         if (move.length > 0 && move[0].type === MoveType.Attack) {
             //Move the attacking piece
-            const worldPositionComponent = system.getComponent(selectedPiece.entity, MinecraftComponent.Position);
+            const worldPositionComponent = system.getComponent(attackingEntity.entity, MinecraftComponent.Position);
             const worldPosition = getEntityWorldPosition(game, attackedEntity.boardPosition.x, attackedEntity.boardPosition.z);
             worldPositionComponent.x = worldPosition.x;
             worldPositionComponent.z = worldPosition.z;
-            selectedPiece.boardPosition.x = attackedEntity.boardPosition.x;
-            selectedPiece.boardPosition.z = attackedEntity.boardPosition.z;
+            attackingEntity.boardPosition.x = attackedEntity.boardPosition.x;
+            attackingEntity.boardPosition.z = attackedEntity.boardPosition.z;
 
             //FIXME: Rather than remove, move the piece off to the side.
             gameState.pieces[attackedEntity.piece.colour] = gameState.pieces[attackedEntity.piece.colour].filter(p => p.entity.id !== attackedEntity.entity.id)
             system.destroyEntity(attackedEntity.entity);
 
-            system.applyComponentChanges(worldPositionComponent);
+            system.applyComponentChanges(attackingEntity.entity, worldPositionComponent);
             return true;
         }
         return false;
@@ -313,32 +317,36 @@ namespace Server {
         }
     }
 
-    function calculatePieceMoves(game: GameState, piece: ChessPieceComponent, boardPosition: VectorXZ): PossiblePieceMove[] {
-        switch(piece.type) {
+    function calculatePieceMoves(game: GameState, piece: GamePieceEntity, boardPosition?: VectorXZ): PossiblePieceMove[] {
+        if (!boardPosition) {
+            boardPosition = piece.boardPosition;
+        }
+
+        switch(piece.piece.type) {
             case Piece.Pawn:
-                return calculatePawnMoves(game, boardPosition, piece.forwardVectorZ);
+                return calculatePawnMoves(game, piece, boardPosition);
             case Piece.Bishop:
-                return calculateBishopMoves(game, boardPosition);
+                return calculateBishopMoves(game, piece, boardPosition);
             case Piece.Rook:
-                return calculateRookMoves(game, boardPosition);
+                return calculateRookMoves(game, piece, boardPosition);
             case Piece.Queen:
-                return calculateQueenMoves(game, boardPosition);
+                return calculateQueenMoves(game, piece, boardPosition);
             case Piece.King:
-                return calculateKingMoves(game, boardPosition);
+                return calculateKingMoves(game, piece, boardPosition);
             case Piece.Knight:
-                return calculateKnightMoves(game, boardPosition);
+                return calculateKnightMoves(game, piece, boardPosition);
         }
         return [];
     }
 
-    function checkCanMove(gameState: GameState, x: number, z: number, canAttack: boolean, addItem: (possiblePieceMove: PossiblePieceMove) => void): boolean {
+    function checkCanMove(gameState: GameState, piece: GamePieceEntity, x: number, z: number, canAttack: boolean, addItem: (possiblePieceMove: PossiblePieceMove) => void): boolean {
         if (x < 0 || x >= 8) return false;
         if (z < 0 || z >= 8) return false;
 
         const gamePiece = findPieceAtLocation(gameState, {x: x, z: z});
         let result = MoveType.Empty;
         if (!!gamePiece) {
-            if (gamePiece.piece.colour === gameState.game.currentPlayerColour) {
+            if (gamePiece.piece.colour === piece.piece.colour) {
                 result = MoveType.Guarding;
             }
             if (canAttack && gamePiece.piece.colour !== gameState.game.currentPlayerColour) {
@@ -356,20 +364,20 @@ namespace Server {
         return result === MoveType.Attack || result === MoveType.Empty;
     }
 
-    function calculatePawnMoves(game: GameState, boardPosition: VectorXZ, forwardVectorZ: number): PossiblePieceMove[] {
+    function calculatePawnMoves(game: GameState, piece: GamePieceEntity, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         let canPlace = true;
 
-        canPlace = canPlace && checkCanMove(game, boardPosition.x, boardPosition.z + 1 * forwardVectorZ, false, move => moves.push(move));
-        canPlace = canPlace && checkCanMove(game, boardPosition.x, boardPosition.z + 2 * forwardVectorZ, false, move => moves.push(move));
+        canPlace = canPlace && checkCanMove(game, piece, boardPosition.x, boardPosition.z + 1 * piece.piece.forwardVectorZ, false, move => moves.push(move));
+        canPlace = canPlace && checkCanMove(game, piece, boardPosition.x, boardPosition.z + 2 * piece.piece.forwardVectorZ, false, move => moves.push(move));
 
         //Only add these moves if it is a valid attack target.
-        checkCanMove(game, boardPosition.x + 1, boardPosition.z + 1 * forwardVectorZ, true, move => move.type === MoveType.Attack && moves.push(move))
-        checkCanMove(game, boardPosition.x - 1, boardPosition.z + 1 * forwardVectorZ, true, move => move.type === MoveType.Attack && moves.push(move))
+        checkCanMove(game, piece, boardPosition.x + 1, boardPosition.z + 1 * piece.piece.forwardVectorZ, true, move => move.type === MoveType.Attack && moves.push(move))
+        checkCanMove(game, piece, boardPosition.x - 1, boardPosition.z + 1 * piece.piece.forwardVectorZ, true, move => move.type === MoveType.Attack && moves.push(move))
         return moves;
     }
 
-    function calculateBishopMoves(game: GameState, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function calculateBishopMoves(game: GameState, piece: GamePieceEntity, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [{x: 1, z: 1}, {x: -1, z: 1}, {x: 1, z: -1}, {x: -1, z: -1}];
 
@@ -379,13 +387,13 @@ namespace Server {
             while (canPlace) {
                 position.x += direction.x;
                 position.z += direction.z;
-                canPlace = checkCanMove(game, position.x, position.z, true, move => moves.push(move));
+                canPlace = checkCanMove(game, piece, position.x, position.z, true, move => moves.push(move));
             }
         }
         return moves;
     }
 
-    function calculateRookMoves(game: GameState, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function calculateRookMoves(game: GameState, piece: GamePieceEntity, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [{x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1}];
         
@@ -396,13 +404,13 @@ namespace Server {
             while (canPlace) {
                 x += direction.x;
                 z += direction.z;
-                canPlace = checkCanMove(game, x, z, true, move => moves.push(move));
+                canPlace = checkCanMove(game, piece, x, z, true, move => moves.push(move));
             }
         }
         return moves;
     }
 
-    function calculateQueenMoves(game: GameState, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function calculateQueenMoves(game: GameState, piece: GamePieceEntity, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1},
@@ -416,13 +424,13 @@ namespace Server {
             while (canPlace) {
                 x += direction.x;
                 z += direction.z;
-                canPlace = checkCanMove(game, x, z, true, move => moves.push(move));
+                canPlace = checkCanMove(game, piece, x, z, true, move => moves.push(move));
             }
         }
         return moves;
     }
 
-    function calculateKingMoves(game: GameState, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function calculateKingMoves(game: GameState, piece: GamePieceEntity, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: 1, z: 0}, {x: -1, z: 0}, {x: 0, z: -1}, {x: 0, z: 1},
@@ -433,7 +441,7 @@ namespace Server {
             const x = boardPosition.x + direction.x;
             const z = boardPosition.z + direction.z;
             //FIXME: verify move would not cause a check/checkmate.
-            checkCanMove(game, x, z, true, move => moves.push(move));
+            checkCanMove(game, piece, x, z, true, move => moves.push(move));
         }
         return moves;
     }
@@ -466,7 +474,7 @@ namespace Server {
         }
     }
 
-    function calculateKnightMoves(game: GameState, boardPosition: VectorXZ): PossiblePieceMove[] {
+    function calculateKnightMoves(game: GameState, piece: GamePieceEntity, boardPosition: VectorXZ): PossiblePieceMove[] {
         const moves: PossiblePieceMove[] = [];
         const directions :VectorXZ[] = [
             {x: -1, z: -2}, {x: 1, z: -2}, {x: -2, z: -1}, {x: 2, z: -1},
@@ -476,7 +484,7 @@ namespace Server {
         for (const direction of directions) {
             const x = boardPosition.x + direction.x;
             const z = boardPosition.z + direction.z;
-            checkCanMove(game, x, z, true, move => moves.push(move));
+            checkCanMove(game, piece, x, z, true, move => moves.push(move));
         }
         return moves;
     }
@@ -508,9 +516,9 @@ namespace Server {
         };
         //FIXME: marker rotations
 
-        system.applyComponentChanges(position);
-        system.applyComponentChanges(rotation);
-        system.applyComponentChanges(marker);
+        system.applyComponentChanges(entity, position);
+        system.applyComponentChanges(entity, rotation);
+        system.applyComponentChanges(entity, marker);
 
         gameState.markers.push({
             entity: entity,
@@ -565,7 +573,12 @@ namespace Server {
         
         if (game.players.length == 2) {
             //FIXME:? Technically there's no reason to update the moves here, the set of starting moves is always well defined.
-            updateAvailableMoves(gameState);
+            
+            //Force update all the available moves
+            for (const piece of allPieces(gameState)) {
+                updatePieceMoves(gameState, piece);
+            }
+
             system.broadcastEvent(ChessEvents.GameStarting, game);
         }
     }
@@ -614,7 +627,7 @@ namespace Server {
         };
 
         const {x: startX, z: startZ} = getWorldPosition(game, 0, 0);
-        system.getEntitiesFromSpatialView(spatialView, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8)
+        system.getEntitiesFromQuery(positionQuery, startX - 8, 0, startZ, startX + 16 + 8, 16, startZ + 16 + 8)
             .forEach(entity => {
                 const position = system.getComponent(entity, MinecraftComponent.Position);
                 const playfieldEntity: EntityNearPlayfield = {
@@ -723,9 +736,9 @@ namespace Server {
         position.z = worldPosition.z;
         rotation.y = colour === PieceColour.Black ? 180 : 0;
 
-        system.applyComponentChanges(chessPiece);
-        system.applyComponentChanges(position);
-        system.applyComponentChanges(rotation);
+        system.applyComponentChanges(entity, chessPiece);
+        system.applyComponentChanges(entity, position);
+        system.applyComponentChanges(entity, rotation);
         
         gameState.pieces[colour].push({
             entity: entity,

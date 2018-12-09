@@ -9,7 +9,7 @@ namespace Client {
     let thisClient: IEntityObject = null
     let playerNumber: number = null;
     let playerLocation: PlayerLocation;
-    let pickHitLocation: {X: number, Y: number, Z: number} = null;
+    let pickHitLocation: VectorXYZ = null;
     let gameBoard: GameInstance;
 
     // Setup which events to listen for
@@ -36,10 +36,10 @@ namespace Client {
     }
 
     function onPickHitResultChanged(eventData: IPickHitResultContinuousEvent) {
-        pickHitLocation = <{X: number, Y: number, Z: number}><any>eventData.position;
+        pickHitLocation = eventData.position;
         if (!!pickHitLocation) {
             const mouseData: NotifyMouseCursor = {
-                gameId: 0, x: pickHitLocation.X, y: pickHitLocation.Y, z: pickHitLocation.Z
+                gameId: 0, x: pickHitLocation.x, y: pickHitLocation.y, z: pickHitLocation.z
             };
             system.broadcastEvent(ChessEvents.NotifyMouseCursor, mouseData);
         }
@@ -51,9 +51,9 @@ namespace Client {
         playerNumber = eventData.number;
     }
 
-    function onClientEnteredWorld(eventData: IEntityObject) {
+    function onClientEnteredWorld(eventData: IClientEnteredWorldParameters) {
         loadUI(UI.Lobby);
-        thisClient = eventData;
+        thisClient = eventData.player;
     }
 
     function onGameStarting(game: GameInstance) {

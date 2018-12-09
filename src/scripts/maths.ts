@@ -5,12 +5,6 @@ export interface VectorXZ {
     z: number;
 }
 
-export interface VectorXYZ {
-    x: number;
-    y: number;
-    z: number;
-}
-
 export interface PlayerLocation {
     x: number;
     y: number;
