@@ -259,11 +259,10 @@ namespace Server {
         updateTurn() {
             this._markerManager.removeMarkers();
             this._game.selectedPiece = null;
-            let currentPlayerColour = this._game.currentPlayerColour;
-            const previousPlayerColour = currentPlayerColour;
-            currentPlayerColour = currentPlayerColour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
+            const previousPlayerColour = this._game.currentPlayerColour;
+            this._game.currentPlayerColour = previousPlayerColour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
     
-            const pieces = this._game.findPiecesByType(currentPlayerColour, Piece.King);
+            const pieces = this._game.findPiecesByType(previousPlayerColour, Piece.King);
             if (pieces.length !== 0) {
                 //Should always be the case. don't allow players to actually kill the king.
                 const king = pieces[0];
@@ -312,11 +311,11 @@ namespace Server {
 
         createMarkers(gamePieceEntity: GamePieceEntity) {
             for (let move of gamePieceEntity.availableMoves) {
-                this.createMarker(move);
+                this.createMarker(move, gamePieceEntity.piece.colour);
             }
         }
     
-        createMarker(move: PossiblePieceMove): boolean {
+        createMarker(move: PossiblePieceMove, colour: PieceColour): boolean {
             const worldPosition = this._game.getEntityWorldPosition(move.x, move.z);
     
             const entity = system.createEntity(EntityType.Entity, MARKER_ENTITY);
@@ -334,7 +333,7 @@ namespace Server {
                 x: move.x,
                 z: move.z
             };
-            //FIXME: marker rotations
+            rotation.y = colour === PieceColour.Black ? 180 : 0;
     
             system.applyComponentChanges(entity, position);
             system.applyComponentChanges(entity, rotation);
