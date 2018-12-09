@@ -1,6 +1,12 @@
 ///<reference types="minecraft-scripting-types-shared" />
 import { VectorXZ } from "./maths";
 
+export interface GameInstance {
+    players: IEntityObject[];
+    location: VectorXZ;
+    worldLocation: VectorXZ;
+}
+
 export interface PieceSet {
     name: PieceSetName,
     pieces: PieceDefinition
@@ -37,15 +43,6 @@ export const enum PieceColour {
     White = "white"
 }
 
-export interface GameInstance {
-    selectedPiece: GamePieceEntity;
-    location: VectorXZ;
-    hasStarted: boolean;
-    players: IEntityObject[];
-    currentPlayerColour: PieceColour;
-    highlightedBlock: VectorXZ;
-    isComplete: boolean;
-}
     
 export interface EntityNearPlayfield {
     entity: IEntityObject;
@@ -62,16 +59,6 @@ export interface GamePieceEntity extends EntityNearPlayfield {
 
 export interface MarkerEntity extends EntityNearPlayfield {
     type: "marker";
-}
-
-export interface GameState {
-    game: GameInstance;
-    pieces: {
-        'white': GamePieceEntity[];
-        'black': GamePieceEntity[];
-    };
-    otherEntities: EntityNearPlayfield[];
-    markers: MarkerEntity[]
 }
 
 export const enum ChessComponents {

@@ -5,7 +5,8 @@ const builder = new ModBuilder("chess");
 builder.scriptTasks = [
     () => ts({
         module: "ES6",
-        noImplicitAny: true
+        noImplicitAny: true,
+        target: "es5"
     })
 ];
 module.exports = builder.configureEverythingForMe();
