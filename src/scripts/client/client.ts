@@ -23,18 +23,6 @@ namespace Client {
         system.listenForEvent(ChessEvents.GameStarting, onGameStarting);
     }
 
-    /*system.update = function () {
-        if (!!gameBoard && !!gameBoard.location) {
-            playerLocation = {
-                x: 7 + gameBoard.location.x,
-                y: 9 + 1.7,
-                z: (playerNumber == 1 ? -2 : 18) + gameBoard.location.z,
-                rotation:  ((playerNumber == 1 ? 0 : 180) * Math.PI / 180.0)
-            }
-        }
-        //playerLocation = playerNumber == 1 ? {x: 7, y: 4, z: -2, rotation: 0} : {x: 7, y: 4, z: 18, rotation: 180}
-    }*/
-
     function onPickHitResultChanged(eventData: IPickHitResultContinuousEvent) {
         pickHitLocation = eventData.position;
         if (!!pickHitLocation) {

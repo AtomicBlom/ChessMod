@@ -6,7 +6,7 @@ builder.scriptTasks = [
     () => ts({
         module: "ES6",
         noImplicitAny: true,
-        target: "es5"
+        target: "ES6"
     })
 ];
 module.exports = builder.configureEverythingForMe();

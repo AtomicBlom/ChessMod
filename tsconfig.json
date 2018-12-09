@@ -4,7 +4,7 @@
         "module": "ES6",
         "noImplicitAny": true,
         "rootDir": "./src",
-        "target": "es5"
+        "target": "es6"
     },
     "include": [
         "src/scripts/*/*",
