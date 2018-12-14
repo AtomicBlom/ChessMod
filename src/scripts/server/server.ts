@@ -121,8 +121,10 @@ namespace Server {
 
         initialize() {
             this._boardGenerator.createBoard();
-            this._boardGenerator.createPieceSet(PieceColour.Black, PieceSetName.Overworld);
-            this._boardGenerator.createPieceSet(PieceColour.White, PieceSetName.Overworld);
+            this._boardGenerator.createPieceSetBlitzkreigBlack(PieceColour.Black, PieceSetName.Overworld);
+            this._boardGenerator.createPieceSetBlitzkreigWhite(PieceColour.White, PieceSetName.Overworld);
+            //this._boardGenerator.createPieceSet(PieceColour.Black, PieceSetName.Overworld);
+            //this._boardGenerator.createPieceSet(PieceColour.White, PieceSetName.Overworld);
             this._game.initialize();
         }
 
@@ -416,9 +418,60 @@ namespace Server {
             this.spawnPiece(pieceSet, Piece.Bishop, player, 5, rearRow);
             this.spawnPiece(pieceSet, Piece.Knight, player, 6, rearRow);
             this.spawnPiece(pieceSet, Piece.Rook, player, 7, rearRow);
+
             for (let i = 0; i < 8; ++i) {
                 this.spawnPiece(pieceSet, Piece.Pawn, player, i, frontRow);
             }
+        }
+
+        createPieceSetBlitzkreigWhite(player: PieceColour, pieceSetName: PieceSetName) {
+            const pieceSet = this.pieceSets.filter(ps => ps.name === pieceSetName)[0];
+
+            const frontRow = player === PieceColour.Black ? 6 : 1;
+            const rearRow = player === PieceColour.Black ? 7 : 0;
+
+            this.spawnPiece(pieceSet, Piece.Rook, player, 0, rearRow);
+            this.spawnPiece(pieceSet, Piece.Knight, player, 1, rearRow);
+            this.spawnPiece(pieceSet, Piece.Bishop, player, 5, 3);
+            this.spawnPiece(pieceSet, Piece.King, player, 3, rearRow);
+            this.spawnPiece(pieceSet, Piece.Queen, player, 0, 4);
+            this.spawnPiece(pieceSet, Piece.Bishop, player, 5, rearRow);
+            this.spawnPiece(pieceSet, Piece.Knight, player, 6, rearRow);
+            this.spawnPiece(pieceSet, Piece.Rook, player, 7, rearRow);
+            
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 0, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 1, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 2, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 3, 2);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 4, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 5, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 6, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 7, frontRow);
+        }
+
+        createPieceSetBlitzkreigBlack(player: PieceColour, pieceSetName: PieceSetName) {
+            const pieceSet = this.pieceSets.filter(ps => ps.name === pieceSetName)[0];
+
+            const frontRow = player === PieceColour.Black ? 6 : 1;
+            const rearRow = player === PieceColour.Black ? 7 : 0;
+
+            this.spawnPiece(pieceSet, Piece.Rook, player, 0, rearRow);
+            this.spawnPiece(pieceSet, Piece.Knight, player, 1, rearRow);
+            this.spawnPiece(pieceSet, Piece.Bishop, player, 2, rearRow);
+            this.spawnPiece(pieceSet, Piece.King, player, 3, rearRow);
+            this.spawnPiece(pieceSet, Piece.Queen, player, 4, rearRow);
+            this.spawnPiece(pieceSet, Piece.Bishop, player, 5, rearRow);
+            this.spawnPiece(pieceSet, Piece.Knight, player, 6, rearRow);
+            this.spawnPiece(pieceSet, Piece.Rook, player, 7, rearRow);
+            
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 0, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 1, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 2, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 3, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 4, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 5, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 6, frontRow);
+            this.spawnPiece(pieceSet, Piece.Pawn, player, 7, 3);
         }
 
         spawnPiece(pieceSet: PieceSet, piece: Piece, colour: PieceColour, x: number, z: number) {
