@@ -47,7 +47,6 @@ export const enum PieceColour {
 export interface EntityNearPlayfield {
     entity: IEntityObject;
     type: "player" | "marker" | "piece" | "other";
-    //worldPosition: IPositionComponent;
     boardPosition: VectorXZ; 
 }
 
@@ -69,6 +68,7 @@ export interface MarkerComponent extends IComponent {
     position: VectorXZ;
 }
 export interface ChessPieceComponent extends IComponent {
+    hasMoved: any;
     type: Piece;
     colour: PieceColour;
     forwardVectorZ: 1 | -1;
