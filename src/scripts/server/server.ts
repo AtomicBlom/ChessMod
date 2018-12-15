@@ -221,15 +221,15 @@ namespace Server {
                         x: selectedPiece.boardPosition.x,
                         z: selectedPiece.boardPosition.z
                     }
-                    if (this._moveManager.attackPiece(selectedPiece, attackedPiece)) {
+                    if (this._moveManager.movePiece(selectedPiece, attackedPiece.boardPosition)) {
                         //After the attack was successful, we need to refresh any pieces affected by the before and after locations of the selected piece.
                         this._moveManager.updateAvailableMoves(originalPosition, boardPosition);
+                        //FIXME: Do I really need this?
                         this._moveManager.updatePieceMoves(selectedPiece);
 
                         //Good, now switch players
                         this.updateTurn();
                     }
-
                 }
                 //Ok, so it's not a game piece that was selected, so now we only want to do further checks
                 //if they have a piece selected, otherwise it's not a valid thing to do.
@@ -550,46 +550,33 @@ namespace Server {
             const move = this.calculatePieceMoves(entity, entity.boardPosition)
                 .filter(move => move.x === newBoardPosition.x && move.z === newBoardPosition.z);
 
+            let moved = false;
             //FIXME: Manage if user clicked on a marker that was actually an attack.
-            if (move.length > 0 && move[0].type === MoveType.Empty) {
-                const worldPositionComponent = system.getComponent(entity.entity, MinecraftComponent.Position);
-                const worldPosition = this.game.getEntityWorldPosition(newBoardPosition.x, newBoardPosition.z);
-                worldPositionComponent.x = worldPosition.x;
-                worldPositionComponent.z = worldPosition.z;
-                entity.boardPosition = newBoardPosition;
-                entity.piece.hasMoved = true;
-                system.applyComponentChanges(entity.entity, worldPositionComponent);
+            if (move.length > 0) {
+                if (move[0].type === MoveType.Attack) {
+                    const attackedEntity =  this.game.findPieceAtLocation(newBoardPosition);
+                    //FIXME: Rather than remove, move the piece off to the side.
+                    this.game.removePiece(attackedEntity)
+                    system.destroyEntity(attackedEntity.entity);
+                }
 
-                //FIXME: if piece was a pawn, allow them to select a piece.
-                return true;
+                if (move[0].type === MoveType.Empty || move[0].type === MoveType.Attack) {
+                    const worldPositionComponent = system.getComponent(entity.entity, MinecraftComponent.Position);
+                    const worldPosition = this.game.getEntityWorldPosition(newBoardPosition.x, newBoardPosition.z);
+
+                    worldPositionComponent.x = worldPosition.x;
+                    worldPositionComponent.z = worldPosition.z;
+                    entity.boardPosition.x = newBoardPosition.x;
+                    entity.boardPosition.z = newBoardPosition.z;
+                    moved = entity.piece.hasMoved = true;
+
+                    system.applyComponentChanges(entity.entity, worldPositionComponent);
+
+                    //FIXME: if piece was a pawn and reached the end of the board, allow them to select a piece.
+                }
             }
 
-            return false;
-        }
-
-        attackPiece(attackingEntity: GamePieceEntity, attackedEntity: GamePieceEntity) {
-            const move = this.calculatePieceMoves(attackingEntity, attackingEntity.boardPosition)
-                .filter(move => move.x === attackedEntity.boardPosition.x && move.z === attackedEntity.boardPosition.z);
-
-            if (move.length > 0 && move[0].type === MoveType.Attack) {
-                //Move the attacking piece
-                const worldPositionComponent = system.getComponent(attackingEntity.entity, MinecraftComponent.Position);
-                const worldPosition = this.game.getEntityWorldPosition(attackedEntity.boardPosition.x, attackedEntity.boardPosition.z);
-                worldPositionComponent.x = worldPosition.x;
-                worldPositionComponent.z = worldPosition.z;
-                attackingEntity.boardPosition.x = attackedEntity.boardPosition.x;
-                attackingEntity.boardPosition.z = attackedEntity.boardPosition.z;
-                attackingEntity.piece.hasMoved = true;
-
-                //FIXME: Rather than remove, move the piece off to the side.
-                this.game.removePiece(attackedEntity)
-                system.destroyEntity(attackedEntity.entity);
-
-                system.applyComponentChanges(attackingEntity.entity, worldPositionComponent);
-                return true;
-            }
-
-            return false;
+            return moved;
         }
 
         calculatePieceMoves(piece: GamePieceEntity, boardPosition?: VectorXZ): PossiblePieceMove[] {
