@@ -733,28 +733,45 @@ namespace Server {
             const possibleEnemyMoves: PossiblePieceMove[] = [];
             for (let entity of this.game.allPieces) {
                 if (entity.piece.colour === kingPieceEntity.piece.colour) continue;
-
-                possibleEnemyMoves.push(...entity.availableMoves);
+                possibleEnemyMoves.push(...entity.availableMoves.filter(am => am.type === MoveType.Attack || am.type === MoveType.Empty));
             }
 
-            const availableKingMoves = kingPieceEntity.availableMoves;
+            const availableKingMoves = kingPieceEntity.availableMoves.filter(am => am.type === MoveType.Attack || am.type === MoveType.Empty);
             const isCheck = possibleEnemyMoves.some(enemyMove => enemyMove.x === atPosition.x && enemyMove.z === atPosition.z);
-            const canKingMove = availableKingMoves.filter(kingMove => !possibleEnemyMoves.some(enemyMove => enemyMove.x === kingMove.x && enemyMove.z === kingMove.z));
+            const canKingMove = availableKingMoves.filter(
+                kingMove => !possibleEnemyMoves.some(
+                    enemyMove => enemyMove.x === kingMove.x && enemyMove.z === kingMove.z
+                )
+            );
+
+            
+            
+            
             //FIXME: verify that an attack by the king wouldn't result in the king being in check.
 
+
+            let kingState: KingState;
             if (isCheck) {
                 if (!canKingMove) {
-                    return KingState.CheckMate;
+                    kingState = KingState.CheckMate;
                 } else {
-                    return KingState.Check;
+                    kingState = KingState.Check;
                 }
             } else {
                 if (canKingMove) {
-                    return KingState.Safe;
+                    kingState = KingState.Safe;
                 } else {
-                    return KingState.Trapped;
+                    kingState = KingState.Trapped;
                 }
             }
+
+            system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${kingPieceEntity.piece.colour} king has ${canKingMove.length} moves - ${kingState}`);
+
+            for (const move of canKingMove) {
+                system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${move.x}, ${move.z} - ${move.type}`);
+            }
+
+            return kingState;
         }
     }
 

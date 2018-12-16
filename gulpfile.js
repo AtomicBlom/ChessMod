@@ -1,7 +1,7 @@
 const ModBuilder = require("minecraft-scripting-toolchain");
 const ts = require("gulp-typescript");
 
-const builder = new ModBuilder("chess");
+const builder = new ModBuilder("Chess");
 builder.scriptTasks = [
     () => ts({
         module: "ES6",

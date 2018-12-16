@@ -81,10 +81,10 @@ export interface PossiblePieceMove {
 }
 
 export const enum KingState {
-    Safe,
-    Check,
-    CheckMate,
-    Trapped
+    Safe = 'safe',
+    Check = 'check',
+    CheckMate = 'checkmate',
+    Trapped = 'trapped'
 }
 
 export const enum MoveType {
