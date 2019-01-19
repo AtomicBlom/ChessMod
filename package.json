@@ -4,15 +4,15 @@
   "scripts": {
     "build": "gulp build",
     "watch": "gulp watch",
-    "installmod": "gulp install",
-    "uninstallmod": "gulp uninstall"
+    "installaddon": "gulp install",
+    "uninstalladdon": "gulp uninstall"
   },
   "devDependencies": {
-    "gulp-typescript": "^5.0.0",
-    "minecraft-scripting-toolchain": "^0.1.0",
+    "minecraft-addon-toolchain": "^1.0.0-alpha.1",
+    "minecraft-addon-toolchain-browserify": "^1.0.0-alpha.1",
+    "minecraft-addon-toolchain-typescript": "^1.0.0-alpha.1",
     "minecraft-scripting-types-client": "^0.2.0-alpha.2",
-    "minecraft-scripting-types-server": "^0.2.0-alpha.2",
-    "typescript": "^3.2.2"
+    "minecraft-scripting-types-server": "^0.2.0-alpha.2"
   },
   "dependencies": {}
 }
