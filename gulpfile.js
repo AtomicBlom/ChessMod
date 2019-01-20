@@ -1,4 +1,4 @@
-const MinecraftAddonBuilder = require("minecraft-addon-toolchain/v2");
+const MinecraftAddonBuilder = require("minecraft-addon-toolchain/v1");
 const TypeScriptSupport = require("minecraft-addon-toolchain-typescript");
 const BrowserifySupport = require("minecraft-addon-toolchain-browserify");
 
