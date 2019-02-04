@@ -43,8 +43,8 @@ export class MoveManager {
                 const worldPositionComponent = this.system.getComponent(entity.entity, MinecraftComponent.Position);
                 const worldPosition = this.game.getEntityWorldPosition(newBoardPosition.x, newBoardPosition.z);
 
-                worldPositionComponent.x = worldPosition.x;
-                worldPositionComponent.z = worldPosition.z;
+                worldPositionComponent.data.x = worldPosition.x;
+                worldPositionComponent.data.z = worldPosition.z;
                 entity.boardPosition.x = newBoardPosition.x;
                 entity.boardPosition.z = newBoardPosition.z;
                 moved = entity.piece.hasMoved = true;

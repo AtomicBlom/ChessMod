@@ -8,7 +8,7 @@ export const enum ChessEvents {
 }
 
 export interface SetPlayerNumberData {
-    player: IEntityObject;
+    player: IEntity;
     number: number;
 }
 

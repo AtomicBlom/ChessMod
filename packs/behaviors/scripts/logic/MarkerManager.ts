@@ -34,22 +34,22 @@ export class MarkerManager {
     createMarker(move: PossiblePieceMove, colour: PieceColour): boolean {
         const worldPosition = this._game.getEntityWorldPosition(move.x, move.z);
 
-        const entity = this._system.createEntity(EntityType.Entity, MARKER_ENTITY);
+        const entity = this._system.createEntity("entity", MARKER_ENTITY);
         const position = this._system.getComponent(entity, MinecraftComponent.Position);
         const rotation = this._system.getComponent(entity, MinecraftComponent.Rotation);
         const marker = this._system.createComponent<MarkerComponent>(entity, ChessComponents.Marker);
 
-        position.x = worldPosition.x;
-        position.y = gameYLevel + 1;
+        position.data.x = worldPosition.x;
+        position.data.y = gameYLevel + 1;
         if (move.type === MoveType.Attack) {
-            position.y += 2;
+            position.data.y += 2;
         }
-        position.z = worldPosition.z;
-        marker.position = {
+        position.data.z = worldPosition.z;
+        marker.data.position = {
             x: move.x,
             z: move.z
         };
-        rotation.y = colour === PieceColour.Black ? 180 : 0;
+        rotation.data.y = colour === PieceColour.Black ? 180 : 0;
 
         this._system.applyComponentChanges(entity, position);
         this._system.applyComponentChanges(entity, rotation);
@@ -58,7 +58,7 @@ export class MarkerManager {
         this.markers.push({
             entity: entity,
             type: "marker",
-            boardPosition: marker.position,
+            boardPosition: marker.data.position,
         })
 
         return true;

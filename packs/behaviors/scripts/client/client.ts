@@ -6,7 +6,7 @@ import { GameInstance } from '../chess'
 
 namespace Client {
     const system = client.registerSystem(0, 0);
-    let thisClient: IEntityObject = null
+    let thisClient: IEntity = null
     let playerNumber: number = null;
     let playerLocation: PlayerLocation;
     let pickHitLocation: VectorXYZ = null;
@@ -23,7 +23,7 @@ namespace Client {
         system.listenForEvent(ChessEvents.GameStarting, onGameStarting);
     }
 
-    function onPickHitResultChanged(eventData: IPickHitResultContinuousEvent) {
+    function onPickHitResultChanged(eventData: IPickHitResultContinuousEventData) {
         pickHitLocation = eventData.position;
         if (!!pickHitLocation) {
             const mouseData: NotifyMouseCursor = {
@@ -39,7 +39,7 @@ namespace Client {
         playerNumber = eventData.number;
     }
 
-    function onClientEnteredWorld(eventData: IClientEnteredWorldParameters) {
+    function onClientEnteredWorld(eventData: IClientEnteredWorldEventData) {
         loadUI(UI.Lobby);
         thisClient = eventData.player;
     }
@@ -65,7 +65,16 @@ namespace Client {
 
     function loadUI(ui: UI) {
         unloadUI();
-        system.broadcastEvent(SendToMinecraftClient.LoadUI, ui)
+        const uiParameters: ILoadUIParameters = {
+            path: ui,
+            /*options: {
+                is_showing_menu: true,
+                always_accepts_input: true,
+                should_steal_mouse: true,
+                absorbs_input: true,
+            }*/
+        }
+        system.broadcastEvent(SendToMinecraftClient.LoadUI, uiParameters)
     }
 
     function unloadUI(ui?: UI) {
@@ -73,7 +82,7 @@ namespace Client {
             unloadUI(UI.Lobby);
             unloadUI(UI.NewGame);
         }
-        system.broadcastEvent(SendToMinecraftClient.UnloadUI, ui)
+        system.broadcastEvent(SendToMinecraftClient.UnloadUI, { path: ui });
     }
 
     enum UI {

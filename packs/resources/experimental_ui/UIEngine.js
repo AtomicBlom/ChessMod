@@ -3,7 +3,7 @@
 	if (typeof module === 'object' && module.exports) {
 		module.exports = factory(global, global.engine, false);
 	} else {
-		engine = factory(this, engine === undefined ? null : engine, true);
+		engine = factory(this, engine, true);
 	}
 })(function (global, engine, hasOnLoad) {
 	'use strict';

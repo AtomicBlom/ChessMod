@@ -130,20 +130,20 @@ export class BoardGenerator {
     }
 
     spawnPiece(pieceSet: PieceSet, piece: Piece, colour: PieceColour, x: number, z: number) {
-        const entity = this._system.createEntity(EntityType.Entity, pieceSet.pieces[piece]);
+        const entity = this._system.createEntity("entity", pieceSet.pieces[piece]);
         const chessPiece = this._system.createComponent<ChessPieceComponent>(entity, ChessComponents.ChessPiece)
         const position = this._system.getComponent(entity, MinecraftComponent.Position);
         const rotation = this._system.getComponent(entity, MinecraftComponent.Rotation);
 
         const worldPosition = this.game.getEntityWorldPosition(x, z);
 
-        chessPiece.type = piece;
-        chessPiece.colour = colour;
-        chessPiece.forwardVectorZ = colour === PieceColour.White ? 1 : -1;
-        position.x = worldPosition.x;
-        position.y = gameYLevel + 1;
-        position.z = worldPosition.z;
-        rotation.y = colour === PieceColour.Black ? 180 : 0;
+        chessPiece.data.type = piece;
+        chessPiece.data.colour = colour;
+        chessPiece.data.forwardVectorZ = colour === PieceColour.White ? 1 : -1;
+        position.data.x = worldPosition.x;
+        position.data.y = gameYLevel + 1;
+        position.data.z = worldPosition.z;
+        rotation.data.y = colour === PieceColour.Black ? 180 : 0;
 
         this._system.applyComponentChanges(entity, chessPiece);
         this._system.applyComponentChanges(entity, position);
@@ -155,7 +155,7 @@ export class BoardGenerator {
                 x: x,
                 z: z,
             },
-            piece: chessPiece,
+            piece: chessPiece.data,
             type: "piece",
             availableMoves: []
         })

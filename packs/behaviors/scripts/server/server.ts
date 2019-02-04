@@ -15,7 +15,7 @@ namespace Server {
     system.initialize = function () {
         system.listenForEvent(ChessEvents.JoinNewGame, onJoinNewGame);
         system.listenForEvent(ChessEvents.NotifyMouseCursor, onNotifyMouseCursor);
-        system.listenForEvent(ReceiveFromMinecraftServer.PlayerAttackedActor, onPlayerAttack);
+        system.listenForEvent(ReceiveFromMinecraftServer.PlayerAttackedEntity, onPlayerAttack);
 
         system.registerComponent(ChessComponents.ChessPiece, <ChessPieceComponent>{
             type: Piece.King,
@@ -30,7 +30,7 @@ namespace Server {
         });
     }
 
-    function onPlayerAttack(eventData: IPlayerAttackedActorEventData) {
+    function onPlayerAttack(eventData: IPlayerAttackedEntityEventData) {
         const playerGames = gameInstances.filter(gb => gb.hasPlayer(eventData.player.id));
         if (playerGames.length === 0) {
             system.broadcastEvent(SendToMinecraftServer.DisplayChat, `You are not in a game`);
@@ -49,7 +49,7 @@ namespace Server {
         game.highlightBlock(eventData.x, eventData.z)
     }
 
-    function onJoinNewGame(player: IEntityObject) {
+    function onJoinNewGame(player: IEntity) {
         const game = findNewGame();
         const playerCount = game.addPlayer(player);
 

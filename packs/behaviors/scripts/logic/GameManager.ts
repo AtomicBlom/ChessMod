@@ -57,16 +57,16 @@ export class GameManager {
         return this._game.players.some(p => p.id === id)
     }
 
-    setPlayerNumber(player: IEntityObject, playerNumber: number) {
+    setPlayerNumber(player: IEntity, playerNumber: number) {
         const worldLocation = this._game.worldLocation;
         const playerName = this._system.getComponent(player, MinecraftComponent.Nameable);
         const playerLocation: PlayerLocation = playerNumber == 1 ? { x: 7, y: 4, z: -2, rotation: 0 } : { x: 7, y: 4, z: 18, rotation: 180 }
-        const movePlayerCommand = `/tp ${playerName.name} ${worldLocation.x + playerLocation.x + 0.5} ${gameYLevel + playerLocation.y} ${worldLocation.z + playerLocation.z} ${playerLocation.rotation} 40`;
+        const movePlayerCommand = `/tp ${playerName.data.name} ${worldLocation.x + playerLocation.x + 0.5} ${gameYLevel + playerLocation.y} ${worldLocation.z + playerLocation.z} ${playerLocation.rotation} 40`;
         this._system.broadcastEvent(SendToMinecraftServer.ExecuteCommand, movePlayerCommand);
         this._system.broadcastEvent(ChessEvents.SetPlayerNumber, { player: player, number: playerNumber });
     }
 
-    processPlayerSelect(player: IEntityObject, attackedEntity: IEntityObject) {
+    processPlayerSelect(player: IEntity, attackedEntity: IEntity) {
         if (this._game.isComplete) {
             return;
         }
@@ -148,7 +148,7 @@ export class GameManager {
                 const boardPosition = marker.boardPosition;
                 this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Moving piece to ${boardPosition.x},${boardPosition.z}`);
                 const previousPiecePosition: VectorXZ = {x: this._game.selectedPiece.boardPosition.x, z: this._game.selectedPiece.boardPosition.z}
-                //Move the selected piece to tdhe marker's location
+                //Move the selected piece to the marker's location
                 if (this._moveManager.movePiece(this._game.selectedPiece, boardPosition)) {
                     //After a successful move, we need to refresh any pieces affected by the before and after locations of the selected piece.
                     this._moveManager.updateAvailableMoves(previousPiecePosition, boardPosition)
@@ -188,7 +188,7 @@ export class GameManager {
         this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `It is now ${this._game.currentPlayerColour}'s turn`);
     }
 
-    addPlayer(player: IEntityObject) {
+    addPlayer(player: IEntity) {
         this._game.players.push(player);
 
         this.setPlayerNumber(player, this._game.players.length);

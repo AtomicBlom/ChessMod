@@ -21,7 +21,7 @@
 
     // Get a handle to the scripting interface on creation.
     // The script interface can trigger events to the client script
-    var scriptEngineHandle = undefined;
+    var scriptEngineHandle = null;
     engine.on("scriptEngine:created", function (scriptEngine) {
         scriptEngineHandle = scriptEngine;
     });
@@ -34,7 +34,11 @@
     }
 
     //Route start and exit buttons to events in the scripting engine
-    document.getElementById("_join_").addEventListener("click", () => sendEvent("chess:join_game"));
-    document.getElementById("_exit_").addEventListener("click", () => sendEvent("chess:close_ui"));
+    document.getElementById("_join_").addEventListener("click", function () {
+        sendEvent("chess:join_game")
+    });
+    document.getElementById("_exit_").addEventListener("click", function () {
+        sendEvent("chess:close_ui")
+    });
 </script>
 </html>

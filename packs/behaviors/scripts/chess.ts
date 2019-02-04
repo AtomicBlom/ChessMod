@@ -2,7 +2,7 @@
 import { VectorXZ } from "./maths";
 
 export interface GameInstance {
-    players: IEntityObject[];
+    players: IEntity[];
     location: VectorXZ;
     worldLocation: VectorXZ;
 }
@@ -45,7 +45,7 @@ export const enum PieceColour {
 
     
 export interface EntityNearPlayfield {
-    entity: IEntityObject;
+    entity: IEntity;
     type: "player" | "marker" | "piece" | "other";
     boardPosition: VectorXZ; 
 }
@@ -64,10 +64,10 @@ export const enum ChessComponents {
     ChessPiece = "chess:chess_piece",
     Marker = "chess:marker"
 }
-export interface MarkerComponent extends IComponent {
+export interface MarkerComponent {
     position: VectorXZ;
 }
-export interface ChessPieceComponent extends IComponent {
+export interface ChessPieceComponent {
     hasMoved: any;
     type: Piece;
     colour: PieceColour;

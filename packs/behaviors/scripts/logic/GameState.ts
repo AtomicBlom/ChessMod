@@ -13,7 +13,7 @@ export class GameState {
     selectedPiece: GamePieceEntity = null;
 
     hasStarted: boolean = false;
-    players: IEntityObject[] = [];
+    players: IEntity[] = [];
     currentPlayerColour: PieceColour = PieceColour.White;
     isComplete: boolean = false;
 
