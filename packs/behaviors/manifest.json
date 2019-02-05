@@ -8,11 +8,22 @@
       1,
       0,
       0
-    ]
+    ],
+    "min_engine_version" : [ 1, 8, 0 ]
   },
   "modules": [
     {
       "description": "behaviours for chess",
+      "type": "data",
+      "uuid": "4d5f1e8f-cc6c-487c-9abe-832251872ee7",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "description": "behaviours for chess client scripts",
       "type": "client_data",
       "uuid": "4d5f1e8f-cc6c-487c-9abe-832251872ee7",
       "version": [

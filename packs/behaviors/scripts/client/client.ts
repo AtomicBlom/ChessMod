@@ -2,7 +2,8 @@
 
 import { ChessEvents, SetPlayerNumberData, ChessUIEvents, UIEventData, MouseMoveUIEventData, NotifyMouseCursor } from '../events';
 import { PlayerLocation } from '../maths';
-import { GameInstance } from '../chess'
+import { GameInstance } from '../chess';
+import { update as timerUpdate, timeout, update } from '../timer';
 
 namespace Client {
     const system = client.registerSystem(0, 0);
@@ -21,6 +22,10 @@ namespace Client {
         system.listenForEvent(ChessEvents.SetPlayerNumber, onSetPlayerNumber);
         system.listenForEvent(ReceiveFromMinecraftClient.HitResultContinuous, onPickHitResultChanged);
         system.listenForEvent(ChessEvents.GameStarting, onGameStarting);
+    }
+
+    system.update = function () {
+        timerUpdate();
     }
 
     function onPickHitResultChanged(eventData: IPickHitResultContinuousEventData) {

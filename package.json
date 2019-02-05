@@ -9,11 +9,11 @@
     "package": "gulp package"
   },
   "devDependencies": {
-    "minecraft-addon-toolchain": "^1.0.0-beta.0",
-    "minecraft-addon-toolchain-browserify": "^1.0.0-beta.0",
-    "minecraft-addon-toolchain-typescript": "^1.0.0-beta.0",
-    "minecraft-scripting-types-client": "^0.2.0",
-    "minecraft-scripting-types-server": "^0.2.0"
+    "minecraft-addon-toolchain": "^1.0.2",
+    "minecraft-addon-toolchain-browserify": "^1.0.2",
+    "minecraft-addon-toolchain-typescript": "^1.0.2",
+    "minecraft-scripting-types-client": "^1.0.0-alpha.1",
+    "minecraft-scripting-types-server": "^1.0.0-alpha.1"
   },
   "dependencies": {}
 }
