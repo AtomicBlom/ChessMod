@@ -74,10 +74,16 @@ export interface ChessPieceComponent {
     forwardVectorZ: 1 | -1;
 }
 
-export interface PossiblePieceMove {
-    x: number,
-    z: number,
-    type: MoveType,
+export class PossiblePieceMove {
+    constructor(public x: number,
+                public z: number,
+                public type: MoveType,
+                public piece: GamePieceEntity) {
+                }
+
+    toString() {
+        return `[${this.x}, ${this.z}] - ${this.type}`
+    }
 }
 
 export const enum KingState {

@@ -85,17 +85,12 @@ export class MoveManager {
         if (z < 0 || z >= 8) return false;
 
         const gamePiece = this.game.findPieceAtLocation({ x: x, z: z });
-        const move: PossiblePieceMove = {
-            x: x,
-            z: z,
-            type: MoveType.Empty
-        }
+        const move: PossiblePieceMove = new PossiblePieceMove(x, z, MoveType.Empty, piece)
 
         if (!!gamePiece) {
             if (gamePiece.piece.colour === piece.piece.colour) {
                 move.type = MoveType.Guarding;
-            }
-            if (canAttack && gamePiece.piece.colour !== piece.piece.colour) {
+            } else if (canAttack && gamePiece.piece.colour !== piece.piece.colour) {
                 move.type = MoveType.Attack;
             } else {
                 move.type = MoveType.Blocked;
@@ -212,41 +207,35 @@ export class MoveManager {
         const possibleEnemyMoves: PossiblePieceMove[] = [];
         for (let entity of this.game.allPieces) {
             if (entity.piece.colour === kingPieceEntity.piece.colour) continue;
-            possibleEnemyMoves.push(...entity.availableMoves.filter(am => am.type === MoveType.Attack || am.type === MoveType.Empty));
+            possibleEnemyMoves.push(...entity.availableMoves.filter(am => am.type === MoveType.Attack || am.type === MoveType.Empty || am.type === MoveType.Guarding));
         }
 
         const availableKingMoves = kingPieceEntity.availableMoves.filter(am => am.type === MoveType.Attack || am.type === MoveType.Empty);
-        const isCheck = possibleEnemyMoves.some(enemyMove => enemyMove.x === atPosition.x && enemyMove.z === atPosition.z);
-        const canKingMove = availableKingMoves.filter(
+        const isCheck = possibleEnemyMoves.some(enemyMove => enemyMove.x === atPosition.x && enemyMove.z === atPosition.z && enemyMove.type !== MoveType.Guarding);
+        const validKingMoves = availableKingMoves.filter(
             kingMove => !possibleEnemyMoves.some(
                 enemyMove => enemyMove.x === kingMove.x && enemyMove.z === kingMove.z
             )
         );
-
         
-        
-        
-        //FIXME: verify that an attack by the king wouldn't result in the king being in check.
-
-
         let kingState: KingState;
         if (isCheck) {
-            if (!canKingMove) {
+            if (validKingMoves.length === 0) {
                 kingState = KingState.CheckMate;
             } else {
                 kingState = KingState.Check;
             }
         } else {
-            if (canKingMove) {
+            if (validKingMoves.length === 0) {
                 kingState = KingState.Safe;
             } else {
                 kingState = KingState.Trapped;
             }
         }
 
-        this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${kingPieceEntity.piece.colour} king has ${canKingMove.length} moves - ${kingState}`);
+        this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${kingPieceEntity.piece.colour} king has ${validKingMoves.length} moves - ${kingState}`);
 
-        for (const move of canKingMove) {
+        for (const move of validKingMoves) {
             this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${move.x}, ${move.z} - ${move.type}`);
         }
 

@@ -172,7 +172,7 @@ export class GameManager {
         const previousPlayerColour = this._game.currentPlayerColour;
         this._game.currentPlayerColour = previousPlayerColour === PieceColour.Black ? PieceColour.White : PieceColour.Black;
 
-        const pieces = this._game.findPiecesByType(previousPlayerColour, Piece.King);
+        const pieces = this._game.findPiecesByType(this._game.currentPlayerColour, Piece.King);
         if (pieces.length !== 0) {
             //Should always be the case. don't allow players to actually kill the king.
             const king = pieces[0];
