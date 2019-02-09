@@ -1,0 +1,27 @@
+{
+	"format_version": "1.8.0",
+	"minecraft:client_entity": {
+		"description": {
+			"identifier": "chess:marker",
+			"materials": {
+				"default": "marker"
+			},
+			"textures": {
+				"default": "textures/entity/marker"
+			},
+			"geometry": {
+				"default": "geometry.marker"
+			},
+			"animations": {
+				"default_pose": "animation.marker.default_pose",
+				"idle": "animation.marker.idle"
+			},
+			"animation_controllers": [
+				{
+					"general": "controller.animation.marker.general"
+				}
+			],
+			"render_controllers": ["controller.render.marker"]
+		}
+	}
+}

@@ -25,7 +25,6 @@
     }
   ],
   "capabilities": [
-     "experimental_custom_ui",
-    "animation_controllers"
+     "experimental_custom_ui"
   ]
 }

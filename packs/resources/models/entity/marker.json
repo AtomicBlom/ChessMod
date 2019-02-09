@@ -1,0 +1,30 @@
+{
+	"format_version": "1.8.0",
+	"geometry.marker": {
+		"texturewidth": 16,
+		"textureheight": 16,
+		"visible_bounds_width": 2,
+		"visible_bounds_height": 1,
+		"visible_bounds_offset": [0, 0.5, 0],
+		"bones": [
+			{
+				"name": "bone",
+				"pivot": [-10, 10, 10],
+				"cubes": []
+			},
+			{
+				"name": "root",
+				"parent": "bone",
+				"pivot": [-10, 10, 10],
+				"rotation": [-45, -45, -45],
+				"cubes": [
+					{
+						"origin": [-12, 8, 8], 
+						"size": [4, 4, 4], 
+						"uv": [0, 0]
+					}
+				]
+			}
+		]
+	}
+}
