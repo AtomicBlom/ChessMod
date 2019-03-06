@@ -4,10 +4,9 @@
       "controller.animation.marker.general": {
         "states": {
           "default": {
-            "animations": {
-              "default_pose": [],
-              "idle": []
-            }
+            "animations": [
+              { "idle": [] }
+            ]
           }
         }
       }

@@ -7,13 +7,12 @@
 				"default": "marker"
 			},
 			"textures": {
-				"default": "textures/entity/marker"
+				"default": "textures/entity/marker/marker"
 			},
 			"geometry": {
 				"default": "geometry.marker"
 			},
 			"animations": {
-				"default_pose": "animation.marker.default_pose",
 				"idle": "animation.marker.idle"
 			},
 			"animation_controllers": [

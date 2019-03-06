@@ -2,6 +2,6 @@
   "materials": {
     "version": "1.0.0",
 
-    "marker:entity_alphablend": {}
+    "marker:entity": {}
   }
 }
