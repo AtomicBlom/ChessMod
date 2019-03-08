@@ -1,0 +1,28 @@
+{
+	"format_version": "1.8.0",
+	"minecraft:client_entity": {
+		"description": {
+			"identifier": "steamnsteel:steam_spider",
+			"materials": {
+				"default": "steam_spider",
+				"bulb": "steam_spider_bulb",
+				"filament": "steam_spider_filament"
+			},
+			"textures": {
+				"default": "textures/entity/steam_spider/steam_spider"
+			},
+			"geometry": {
+				"default": "geometry.steam_spider"
+			},
+			"animations": {
+				"idle": "animation.steam_spider.idle"
+			},
+			"animation_controllers": [
+				{
+					"general": "controller.animation.steam_spider.general"
+				}
+			],
+			"render_controllers": ["controller.render.steam_spider"]
+		}
+	}
+}

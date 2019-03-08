@@ -2,10 +2,10 @@
     "format_version": "1.8.0",
     "minecraft:entity": {
         "description": {
-            "identifier": "chess:marker",
-            "is_spawnable": false,
+            "identifier": "steamnsteel:steam_spider",
+            "is_spawnable": true,
             "is_summonable": true,
-            "is_experimental": false
+            "is_experimental": true
         },
         "components": {
             "minecraft:type_family": {
