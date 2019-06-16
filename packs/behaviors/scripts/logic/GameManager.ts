@@ -2,7 +2,7 @@ import { MarkerManager } from "./MarkerManager";
 import { VectorXZ, PlayerLocation } from "../maths";
 import { GameState } from "./GameState";
 import { PieceColour, PieceSetName, KingState, GameInstance, Piece } from "../chess";
-import { ChessEvents } from "../events";
+import { ChessEvents, SetPlayerNumberEvent } from "../events";
 import { BoardGenerator } from "./BoardGenerator";
 import { MoveManager } from "./MoveManager";
 import { gameYLevel } from "../constants";
@@ -43,13 +43,17 @@ export class GameManager {
             this._moveManager.updatePieceMoves(piece);
         }
 
-        const startEvent: GameInstance = {
-            players: this._game.players,
-            location: this._game.location,
-            worldLocation: this._game.worldLocation
-        }
+        const gameStartingEventData = this._system.createEventData<GameInstance>(ChessEvents.GameStarting);
+        Object.assign(
+            gameStartingEventData.data,
+            <GameInstance>{
+                players: this._game.players,
+                location: this._game.location,
+                worldLocation: this._game.worldLocation
+            }
+        );
 
-        this._system.broadcastEvent(ChessEvents.GameStarting, startEvent);
+        this._system.broadcastEvent(ChessEvents.GameStarting, gameStartingEventData);
         this._game.hasStarted = true;
     }
 
@@ -62,8 +66,12 @@ export class GameManager {
         const playerName = this._system.getComponent(player, MinecraftComponent.Nameable);
         const playerLocation: PlayerLocation = playerNumber == 1 ? { x: 7, y: 4, z: -2, rotation: 0 } : { x: 7, y: 4, z: 18, rotation: 180 }
         const movePlayerCommand = `/tp ${playerName.data.name} ${worldLocation.x + playerLocation.x + 0.5} ${gameYLevel + playerLocation.y} ${worldLocation.z + playerLocation.z} ${playerLocation.rotation} 40`;
-        this._system.broadcastEvent(SendToMinecraftServer.ExecuteCommand, movePlayerCommand);
-        this._system.broadcastEvent(ChessEvents.SetPlayerNumber, { player: player, number: playerNumber });
+        this._system.executeCommand(movePlayerCommand, () => {});
+
+        const setPlayerNumberEvent = this._system.createEventData<SetPlayerNumberEvent>(ChessEvents.SetPlayerNumber);
+        setPlayerNumberEvent.data.player = player;
+        setPlayerNumberEvent.data.number = playerNumber;
+        this._system.broadcastEvent(ChessEvents.SetPlayerNumber, setPlayerNumberEvent);
     }
 
     processPlayerSelect(player: IEntity, attackedEntity: IEntity) {
@@ -73,7 +81,9 @@ export class GameManager {
 
         const expectedPlayer = this._game.players[this._game.currentPlayerColour === PieceColour.White ? 0 : 1];
         if (expectedPlayer.id !== player.id) {
-            this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `It is not your turn`);
+            const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+            displayChatEvent.data.message = `It is not your turn`;
+            this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
             return;
         }
 
@@ -90,16 +100,22 @@ export class GameManager {
                 //Selecting a game piece.
                 //First, ensure that the selected chess piece is for the correct player
                 if (chessPiece.colour !== this._game.currentPlayerColour) {
-                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cannot select ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} belongs to ${chessPiece.colour}`);
+                    const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                    displayChatEvent.data.message = `Cannot select ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} belongs to ${chessPiece.colour}`;
+                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                     return;
                 };
                 //Now let's make sure that the piece can actually do something.
                 if (attackedPiece.availableMoves.length === 0) {
-                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cannot select ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} there are no moves available`);
+                    const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                    displayChatEvent.data.message = `Cannot select ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} there are no moves available`;
+                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                     return;
                 };
                 //If we got this far, we have an entity we can select, so let's start tracking it
-                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Selected ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
+                const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                displayChatEvent.data.message = `Selected ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`;
+                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                 this._game.selectedPiece = attackedPiece;
                 //Create visual indicators of where they can move.
                 this._markerManager.createMarkers(this._game.selectedPiece);
@@ -111,7 +127,9 @@ export class GameManager {
                     this._game.selectedPiece = null;
                     //Clear any shown markers
                     this._markerManager.removeMarkers();
-                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cancelled move for ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
+                    const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                    displayChatEvent.data.message = `Cancelled move for ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`;
+                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                     return;
                 }
 
@@ -119,12 +137,16 @@ export class GameManager {
                 //First make sure they're not attacking their own piece.
                 //FIXME: This is where we would need something special in here to allow castling
                 if (chessPiece.colour === this._game.currentPlayerColour) {
-                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Cannot attack ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} belongs to you`);
+                    const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                    displayChatEvent.data.message = `Cannot attack ${chessPiece.type} at ${boardPosition.x},${boardPosition.z} belongs to you`;
+                    this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                     return;
                 }
 
                 //Checks passed? Ok, let's attack!
-                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Attacking ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`);
+                const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                displayChatEvent.data.message = `Attacking ${chessPiece.colour} ${chessPiece.type} at ${boardPosition.x},${boardPosition.z}`
+                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                 const originalPosition = {
                     x: selectedPiece.boardPosition.x,
                     z: selectedPiece.boardPosition.z
@@ -146,7 +168,9 @@ export class GameManager {
             const marker = this._markerManager.findMarkerById(attackedEntity.id);
             if (!!marker) {
                 const boardPosition = marker.boardPosition;
-                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Moving piece to ${boardPosition.x},${boardPosition.z}`);
+                const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                displayChatEvent.data.message = `Moving piece to ${boardPosition.x},${boardPosition.z}`;
+                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                 const previousPiecePosition: VectorXZ = {x: this._game.selectedPiece.boardPosition.x, z: this._game.selectedPiece.boardPosition.z}
                 //Move the selected piece to the marker's location
                 if (this._moveManager.movePiece(this._game.selectedPiece, boardPosition)) {
@@ -180,12 +204,16 @@ export class GameManager {
             const kingState = this._moveManager.isKingInCheck(king, king.boardPosition);
             if (kingState === KingState.CheckMate) {
                 this._game.isComplete = true;
-                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${previousPlayerColour} has won the game`);
+                const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+                displayChatEvent.data.message = `${previousPlayerColour} has won the game`;
+                this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
                 return;
             }
         }
 
-        this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, `It is now ${this._game.currentPlayerColour}'s turn`);
+        const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+        displayChatEvent.data.message = `It is now ${this._game.currentPlayerColour}'s turn`;
+        this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
     }
 
     addPlayer(player: IEntity) {

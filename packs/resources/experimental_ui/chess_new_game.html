@@ -19,16 +19,15 @@
 </body>
 
 <script type="text/javascript">
-
-    // Get a handle to the scripting interface on creation.
-    // The script interface can trigger events to the client script
-    var scriptEngineHandle = undefined;
-    engine.on("scriptEngine:created", function (scriptEngine) {
-        scriptEngineHandle = scriptEngine;
-    });
+	// Get a handle to the scripting interface on creation.
+	// The script interface can trigger events to the client script
+	let scriptInterface = null;
+	engine.on("facet:updated:core.scripting", function (interface) {
+		scriptInterface = interface;
+	});
 
     function sendEvent(eventName, eventData) {
-        scriptEngineHandle.triggerEvent(JSON.stringify({
+        scriptInterface.triggerEvent(JSON.stringify({
             name: eventName,
             data: eventData
         }))

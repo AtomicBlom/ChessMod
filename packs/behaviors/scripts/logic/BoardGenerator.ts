@@ -1,3 +1,5 @@
+/// <reference types="minecraft-scripting-types-server" />
+
 import { PieceSet, PieceSetName, PieceColour, Piece, ChessPieceComponent, ChessComponents } from "../chess";
 import { GameState } from "./GameState";
 import { VectorXZ } from "../maths";
@@ -38,25 +40,25 @@ export class BoardGenerator {
             .filter(e => e.__identifier__ !== "minecraft:player")
             .forEach(e => this._system.destroyEntity(e));
 
-        this.executeCommand(`/fill ${x} ${gameYLevel} ${z} ${x + 16} ${gameYLevel} ${z + 16} air`);
+        this._system.executeCommand(`/fill ${x} ${gameYLevel} ${z} ${x + 16} ${gameYLevel} ${z + 16} air`, () => {});
 
         for (let gridZ = 0; gridZ < 8; gridZ++) {
             for (let gridX = 0; gridX < 8; gridX++) {
                 const block = this.getBlockType({ x: gridX, z: gridZ });
                 const command = `/fill ${x + gridX * 2} ${gameYLevel} ${z + gridZ * 2} ${x + gridX * 2 + 1} ${gameYLevel} ${z + gridZ * 2 + 1} ${block}`;
-                this.executeCommand(command);
+                this._system.executeCommand(command, () => {});
             }
         }
 
-        this.executeCommand(`/fill ` +
+        this._system.executeCommand(`/fill ` +
             `${x + 7} ${gameYLevel + 3} ${z + -2} ` +
             `${x + 8} ${gameYLevel + 3} ${z + -2} ` +
-            `concrete 0`);
+            `concrete 0`, () => {});
 
-            this.executeCommand(`/fill ` +
+        this._system.executeCommand(`/fill ` +
             `${x + 7} ${gameYLevel + 3} ${z + 18} ` +
             `${x + 8} ${gameYLevel + 3} ${z + 18} ` +
-            `concrete 15`);
+            `concrete 15`, () => {});
     }
 
     createPieceSet(player: PieceColour, pieceSetName: PieceSetName) {
@@ -168,18 +170,14 @@ export class BoardGenerator {
             const block = this.getBlockType(highlightedBlock);
             const worldPosition = this.game.getWorldPosition(highlightedBlock.x, highlightedBlock.z)
             const command = `/fill ${worldPosition.x} ${gameYLevel} ${worldPosition.z} ${worldPosition.x + 1} ${gameYLevel} ${worldPosition.z + 1} ${block}`;
-            this.executeCommand(command);
+            this._system.executeCommand(command, () => {});
         }
 
         if (!!boardPosition) {
             const worldPosition = this.game.getWorldPosition(boardPosition.x, boardPosition.z)
 
             const command = `/fill ${worldPosition.x} ${gameYLevel} ${worldPosition.z} ${worldPosition.x + 1} ${gameYLevel} ${worldPosition.z + 1} diamond_block`;
-            this.executeCommand(command);
+            this._system.executeCommand(command, () => {});
         }
-    }
-
-    executeCommand(command: string) {
-        this._system.broadcastEvent(SendToMinecraftServer.ExecuteCommand, command);
     }
 }

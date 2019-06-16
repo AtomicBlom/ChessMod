@@ -9,7 +9,6 @@
     },
     "steam_spider_filament:entity_alphatest": {
       "+states": [ "DisableCulling" ]
-            
     }
   }
 }

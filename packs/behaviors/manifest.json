@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "header": {
-    "name": "chess",
+    "name": "Chess Behaviours",
     "description": "Chess for Minecraft",
     "uuid": "11a8617e-a9b5-4b9d-a2b7-e7859dea1ace",
     "version": [

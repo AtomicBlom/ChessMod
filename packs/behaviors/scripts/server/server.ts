@@ -1,7 +1,7 @@
 /// <reference types="minecraft-scripting-types-server" />
 
-import { Piece, PieceColour, MarkerComponent, ChessComponents, ChessPieceComponent } from '../chess';
-import { ChessEvents, NotifyMouseCursor } from '../events';
+import { Piece, PieceColour, MarkerComponent, ChessComponents, ChessPieceComponent, GameInstance } from '../chess';
+import { ChessEvents, NotifyMouseCursorEvent, SetPlayerNumberEvent, JoinGameEvent } from '../events';
 import { VectorXZ } from '../maths';
 import { GameState } from '../logic/GameState';
 import { GameManager } from '../logic/GameManager';
@@ -13,6 +13,16 @@ namespace Server {
 
     // Setup which events to listen for
     system.initialize = function () {
+        system.registerEventData<GameInstance>(ChessEvents.GameStarting, {
+            location: {x: 0, z: 0},
+            players: [],
+            worldLocation: {x: 0, z: 0}
+        });
+        system.registerEventData<SetPlayerNumberEvent>(ChessEvents.SetPlayerNumber, {
+            player: null,
+            number: 0
+        });
+
         system.listenForEvent(ChessEvents.JoinNewGame, onJoinNewGame);
         system.listenForEvent(ChessEvents.NotifyMouseCursor, onNotifyMouseCursor);
         system.listenForEvent(ReceiveFromMinecraftServer.PlayerAttackedEntity, onPlayerAttack);
@@ -28,30 +38,42 @@ namespace Server {
                 z: 0
             }
         });
+
+        const scriptLoggerConfig = system.createEventData(SendToMinecraftServer.ScriptLoggerConfig);
+        scriptLoggerConfig.data.log_errors = true;
+        scriptLoggerConfig.data.log_information = true;
+        scriptLoggerConfig.data.log_warnings = true;
+        
+        system.broadcastEvent(
+            SendToMinecraftServer.ScriptLoggerConfig, 
+            scriptLoggerConfig
+        )
     }
 
-    function onPlayerAttack(eventData: IPlayerAttackedEntityEventData) {
-        const playerGames = gameInstances.filter(gb => gb.hasPlayer(eventData.player.id));
+    function onPlayerAttack(eventData: IEventData<IPlayerAttackedEntityEventData>) {
+        const playerGames = gameInstances.filter(gb => gb.hasPlayer(eventData.data.player.id));
         if (playerGames.length === 0) {
-            system.broadcastEvent(SendToMinecraftServer.DisplayChat, `You are not in a game`);
+            const displayChatEvent = system.createEventData(SendToMinecraftServer.DisplayChat);
+            displayChatEvent.data.message = `You are not in a game`;
+            system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
             return;
         };
 
         const game = playerGames[0];
-        game.processPlayerSelect(eventData.player, eventData.attacked_entity);
+        game.processPlayerSelect(eventData.data.player, eventData.data.attacked_entity);
     }
 
-    function onNotifyMouseCursor(eventData: NotifyMouseCursor) {
-        const gameState = gameInstances[eventData.gameId];
+    function onNotifyMouseCursor(eventData: IEventData<NotifyMouseCursorEvent>) {
+        const gameState = gameInstances[eventData.data.gameId];
         if (!gameState) return;
         const game = gameState;
 
-        game.highlightBlock(eventData.x, eventData.z)
+        game.highlightBlock(eventData.data.x, eventData.data.z)
     }
 
-    function onJoinNewGame(player: IEntity) {
+    function onJoinNewGame(player: IEventData<JoinGameEvent>) {
         const game = findNewGame();
-        const playerCount = game.addPlayer(player);
+        const playerCount = game.addPlayer(player.data.client);
 
         if (playerCount == 2) {
             game.start();
@@ -85,7 +107,9 @@ namespace Server {
         const game = new GameState(location);
         const gameManager = new GameManager(system, game);
         const gameWorldLocation = game.getWorldPosition(0, 0);
-        system.broadcastEvent(SendToMinecraftServer.DisplayChat, `Creating new gameboard at ${gameWorldLocation.x}, ${gameWorldLocation.z}`);
+        const displayChatEvent = system.createEventData(SendToMinecraftServer.DisplayChat);
+        displayChatEvent.data.message = `Creating new gameboard at ${gameWorldLocation.x}, ${gameWorldLocation.z}`
+        system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
         gameManager.initialize();
         return gameManager;
     }

@@ -1,9 +1,9 @@
 ///<reference types="minecraft-scripting-types-client" />
 
-import { ChessEvents, SetPlayerNumberData, ChessUIEvents, UIEventData, MouseMoveUIEventData, NotifyMouseCursor } from '../events';
+import { ChessEvents, ChessUIEvents, UIEventData, NotifyMouseCursorEvent, JoinGameEvent, SetPlayerNumberEvent } from '../events';
 import { PlayerLocation } from '../maths';
 import { GameInstance } from '../chess';
-import { update as timerUpdate, timeout, update } from '../timer';
+import { update as timerUpdate } from '../timer';
 
 namespace Client {
     const system = client.registerSystem(0, 0);
@@ -15,52 +15,77 @@ namespace Client {
 
     // Setup which events to listen for
     system.initialize = function () {
+        system.registerEventData<NotifyMouseCursorEvent>(ChessEvents.NotifyMouseCursor, {
+            gameId: 0,
+            x: 0,
+            y: 0,
+            z: 0
+        });
+        system.registerEventData<JoinGameEvent>(ChessEvents.JoinNewGame, {
+            client: null
+        });
+
         // set up your listenToEvents and register client-side components here.
-            // Setup callback for UI events from the custom screens
+        // Setup callback for UI events from the custom screens
         system.listenForEvent(ReceiveFromMinecraftClient.UIEvent, onUIMessage);
         system.listenForEvent(ReceiveFromMinecraftClient.ClientEnteredWorld, onClientEnteredWorld);
-        system.listenForEvent(ChessEvents.SetPlayerNumber, onSetPlayerNumber);
         system.listenForEvent(ReceiveFromMinecraftClient.HitResultContinuous, onPickHitResultChanged);
+        system.listenForEvent(ChessEvents.SetPlayerNumber, onSetPlayerNumber);
         system.listenForEvent(ChessEvents.GameStarting, onGameStarting);
+
+        const scriptLoggerConfig = system.createEventData(SendToMinecraftClient.ScriptLoggerConfig);
+        scriptLoggerConfig.data.log_errors = true;
+        scriptLoggerConfig.data.log_information = true;
+        scriptLoggerConfig.data.log_warnings = true;
+        
+        system.broadcastEvent(
+            SendToMinecraftClient.ScriptLoggerConfig, 
+            scriptLoggerConfig
+        )
     }
 
     system.update = function () {
         timerUpdate();
     }
 
-    function onPickHitResultChanged(eventData: IPickHitResultContinuousEventData) {
-        pickHitLocation = eventData.position;
+    function onPickHitResultChanged(eventData: IEventData<IPickHitResultContinuousEventData>) {
+        pickHitLocation = eventData.data.position;
         if (!!pickHitLocation) {
-            const mouseData: NotifyMouseCursor = {
-                gameId: 0, x: pickHitLocation.x, y: pickHitLocation.y, z: pickHitLocation.z
-            };
-            system.broadcastEvent(ChessEvents.NotifyMouseCursor, mouseData);
+            const mouseDataEvent = system.createEventData<NotifyMouseCursorEvent>(ChessEvents.NotifyMouseCursor);
+            mouseDataEvent.data.gameId = 0;
+            mouseDataEvent.data.x = pickHitLocation.x;
+            mouseDataEvent.data.y = pickHitLocation.y;
+            mouseDataEvent.data.z = pickHitLocation.z;
+            system.broadcastEvent(ChessEvents.NotifyMouseCursor, mouseDataEvent);
         }
     }
 
-    function onSetPlayerNumber(eventData: SetPlayerNumberData) {
-        if (eventData.player.id !== thisClient.id) return;
+    function onSetPlayerNumber(eventData: IEventData<SetPlayerNumberEvent>) {
+        if (eventData.data.player.id !== thisClient.id) return;
         pickHitLocation = null;
-        playerNumber = eventData.number;
+        playerNumber = eventData.data.number;
     }
 
-    function onClientEnteredWorld(eventData: IClientEnteredWorldEventData) {
+    function onClientEnteredWorld(eventData: IEventData<IClientEnteredWorldEventData>) {
         loadUI(UI.Lobby);
-        thisClient = eventData.player;
+        thisClient = eventData.data.player;
     }
 
-    function onGameStarting(game: GameInstance) {
-        if (!game.players.some(p => p.id === thisClient.id)) return;
-        gameBoard = game;
+    function onGameStarting(game: IEventData<GameInstance>) {
+        if (!game.data.players.some(p => p.id === thisClient.id)) return;
+        gameBoard = game.data;
         unloadUI(UI.Lobby);
         //loadUI(UI.NewGame);
     }
 
-    function onUIMessage(event: string) {
-        const eventData = <UIEventData>JSON.parse(event);
+    function onUIMessage(event: IEventData<string>) {
+        const eventData = <UIEventData>JSON.parse(event.data);
         switch (eventData.name) {
             case ChessUIEvents.JoinGame:
-                system.broadcastEvent(ChessEvents.JoinNewGame, thisClient);
+                const joinGameEvent = system.createEventData<JoinGameEvent>(ChessEvents.JoinNewGame);
+                joinGameEvent.data.client = thisClient;
+
+                system.broadcastEvent(ChessEvents.JoinNewGame, joinGameEvent);
                 break;
             case ChessUIEvents.CloseUI:
                 unloadUI();
@@ -70,16 +95,11 @@ namespace Client {
 
     function loadUI(ui: UI) {
         unloadUI();
-        const uiParameters: ILoadUIParameters = {
-            path: ui,
-            /*options: {
-                is_showing_menu: true,
-                always_accepts_input: true,
-                should_steal_mouse: true,
-                absorbs_input: true,
-            }*/
-        }
-        system.broadcastEvent(SendToMinecraftClient.LoadUI, uiParameters)
+
+        const loadUIEvent = system.createEventData(SendToMinecraftClient.LoadUI);
+        loadUIEvent.data.path = ui;
+
+        system.broadcastEvent(SendToMinecraftClient.LoadUI, loadUIEvent)
     }
 
     function unloadUI(ui?: UI) {
@@ -87,7 +107,11 @@ namespace Client {
             unloadUI(UI.Lobby);
             unloadUI(UI.NewGame);
         }
-        system.broadcastEvent(SendToMinecraftClient.UnloadUI, { path: ui });
+
+        const unloadUIEvent = system.createEventData(SendToMinecraftClient.UnloadUI);
+        unloadUIEvent.data.path = ui;
+
+        system.broadcastEvent(SendToMinecraftClient.UnloadUI, unloadUIEvent);
     }
 
     enum UI {

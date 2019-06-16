@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "header": {
-    "name": "chess",
+    "name": "Chess Resources",
     "description": "Chess for Minecraft",
     "platform_locked" : false,
     "uuid": "7bfb610f-cb55-4b71-96aa-57265de8db5a",

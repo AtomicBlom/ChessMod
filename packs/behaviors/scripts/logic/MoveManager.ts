@@ -232,11 +232,14 @@ export class MoveManager {
                 kingState = KingState.Trapped;
             }
         }
+        const displayChatEvent = this.system.createEventData(SendToMinecraftServer.DisplayChat);
+        displayChatEvent.data.message = `${kingPieceEntity.piece.colour} king has ${validKingMoves.length} moves - ${kingState}`;
 
-        this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${kingPieceEntity.piece.colour} king has ${validKingMoves.length} moves - ${kingState}`);
+        this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
 
         for (const move of validKingMoves) {
-            this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, `${move.x}, ${move.z} - ${move.type}`);
+            displayChatEvent.data.message = `${kingPieceEntity.piece.colour} king has ${validKingMoves.length} moves - ${kingState}`;
+            this.system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
         }
 
         return kingState;

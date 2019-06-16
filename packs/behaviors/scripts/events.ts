@@ -7,16 +7,20 @@ export const enum ChessEvents {
     NotifyMouseCursor = 'chess:notify_mouse_cursor'
 }
 
-export interface SetPlayerNumberData {
+export interface SetPlayerNumberEvent {
     player: IEntity;
     number: number;
 }
 
-export interface NotifyMouseCursor {
+export interface NotifyMouseCursorEvent {
     gameId: number,
     x: number,
     y: number,
     z: number
+}
+
+export interface JoinGameEvent {
+    client: IEntity
 }
 
 export const enum ChessUIEvents {

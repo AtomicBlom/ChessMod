@@ -13,7 +13,9 @@ export class MarkerManager {
         const locatedMarkers = this.markers.filter(p => p.entity.id === id);
         if (locatedMarkers.length == 0) return null;
         if (locatedMarkers.length > 1) {
-            this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, "Apparently more than marker was matched by ID... how...?");
+            const displayChatEvent = this._system.createEventData(SendToMinecraftServer.DisplayChat);
+            displayChatEvent.data.message = "Apparently more than marker was matched by ID... how...?";
+            this._system.broadcastEvent(SendToMinecraftServer.DisplayChat, displayChatEvent);
         }
         return locatedMarkers[0];
     }
