@@ -2,13 +2,6 @@
   "materials": {
     "version": "1.0.0",
 
-    "marker:entity": {},
-    "steam_spider:entity": {},
-    "steam_spider_bulb:entity_alphablend": {
-      "+states": [ "DisableDepthWrite" ]
-    },
-    "steam_spider_filament:entity_alphatest": {
-      "+states": [ "DisableCulling" ]
-    }
+    "marker:entity": {}
   }
 }

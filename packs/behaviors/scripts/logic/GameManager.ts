@@ -29,10 +29,10 @@ export class GameManager {
 
     initialize() {
         this._boardGenerator.createBoard();
-        this._boardGenerator.createPieceSetBlitzkreigBlack(PieceColour.Black, PieceSetName.Overworld);
-        this._boardGenerator.createPieceSetBlitzkreigWhite(PieceColour.White, PieceSetName.Overworld);
-        //this._boardGenerator.createPieceSet(PieceColour.Black, PieceSetName.Overworld);
-        //this._boardGenerator.createPieceSet(PieceColour.White, PieceSetName.Overworld);
+        //this._boardGenerator.createPieceSetBlitzkreigBlack(PieceColour.Black, PieceSetName.Overworld);
+        //this._boardGenerator.createPieceSetBlitzkreigWhite(PieceColour.White, PieceSetName.Overworld);
+        this._boardGenerator.createPieceSet(PieceColour.Black, PieceSetName.Overworld);
+        this._boardGenerator.createPieceSet(PieceColour.White, PieceSetName.Overworld);
         this._game.initialize();
     }
 
